@@ -1,13 +1,11 @@
 import tkinter as tk
 import random
 from tkinter import messagebox
-# Глобальное состояние
 money = 10
 ticket = 10
 upgrade_cost=10
 credit = random.randint(1, 100)
 money_per_click = 1
-# Словарь анекдотов
 jokes = {
     (0, 0, 0): "Мужик в казино ставит всё на ноль. Проигрывает. Подходит к рулетке и шепчет:\n— Нолик, ну мы же с тобой договаривались...",
     (0, 0, 1): "Выпало 0, 0, 1. «Даже астролог бы развёл руками».",
@@ -550,7 +548,6 @@ def upgrade():
         update()
 
 def enable_dep_button():
-    """Включает кнопку обратно и сбрасывает текст статуса."""
     dep_btn.config(state="normal")
     win_text.config(text="")
 
@@ -617,7 +614,6 @@ def switch_to_menu1():
 
 
 def enable_dep1_button():
-    """Включает кнопку обратно и сбрасывает текст статуса."""
     dep_btn1.config(state="normal")
 
 
@@ -683,7 +679,7 @@ upgrade_cost1.pack(pady=20)
 p = tk.Button(menu_frame, text="Перестать", font=("Arial", 25), command=ex)
 p.pack(anchor="s", pady=5)
 
-# === Фрейм 2: Игра ===
+
 game_frame = tk.Frame(root)
 game_frame.config(bg="gray")
 
@@ -708,7 +704,7 @@ dep_btn.pack(anchor="s", pady=5)
 back_btn0 = tk.Button(game_frame, text="меню", font=("Arial", 20), command=switch_to_menu)
 back_btn0.pack(anchor="s", pady=5)
 
-# === Эксклюзивное казино ===
+
 game_frame1 = tk.Frame(root)
 game_frame1.config(bg="gold")
 money_text1 = tk.Label(game_frame1, text=f"Билетов: {ticket}", font=("Arial", 25))
