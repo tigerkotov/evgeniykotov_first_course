@@ -590,11 +590,9 @@ def spin_step(step, total_steps, t, win_label, money_label, credit_label):
 
 
 def dep():
-    # Отключаем кнопку сразу при нажатии
     dep_btn.config(state="disabled")
     sys_msg_label.config(text="")
     win_text.config(text="Крутим...")
-    # Передаем функцию обратного вызова в спин
     spin_step(0, 100, dep_text, win_text, money_text, c_text)
     update()
 def update():
@@ -617,12 +615,11 @@ def switch_to_menu1():
     game_frame1.pack_forget()
     menu_frame.pack(fill="both", expand=True)
 
-# --- НОВЫЕ ФУНКЦИИ ДЛЯ ПЕРЕРЫВА ---
 
 def enable_dep1_button():
     """Включает кнопку обратно и сбрасывает текст статуса."""
     dep_btn1.config(state="normal")
-# Очищаем поле анекдота для следующего раза
+
 
 def spin_step1(step1, total_steps1, t1, win_label1, money_label1):
     global ticket
@@ -648,8 +645,6 @@ def spin_step1(step1, total_steps1, t1, win_label1, money_label1):
             
             
         else:
-            # Если игра продолжается, включаем кнопку через 1.5 секунды
-            # (чтобы игрок успел прочитать анекдот)
             root.after(1500, enable_dep1_button)
         return
         
@@ -657,21 +652,18 @@ def spin_step1(step1, total_steps1, t1, win_label1, money_label1):
     root.after(20, lambda: spin_step1(step1 + 1, total_steps1, t1, win_label1, money_label1))
 
 def dep1():
-    # Отключаем кнопку сразу при нажатии
     dep_btn1.config(state="disabled")
     sys_msg_label1.config(text="")
     win_text1.config(text="Крутим...")
-    # Передаем функцию обратного вызова в спин
     spin_step1(0, 100, dep_text1, win_text1, money_text1)
     
 
-# --- Окно ---
 root = tk.Tk()
 root.title("КАЗИНО")
 root.geometry("1000x1000")
 root.resizable(False, False)
 
-# === Фрейм 1: Меню ===
+
 menu_frame = tk.Frame(root)
 menu_frame.pack(fill="both", expand=True)
 
@@ -716,7 +708,7 @@ dep_btn.pack(anchor="s", pady=5)
 back_btn0 = tk.Button(game_frame, text="меню", font=("Arial", 20), command=switch_to_menu)
 back_btn0.pack(anchor="s", pady=5)
 
-# === Фрейм 3: Эксклюзивное казино ===
+# === Эксклюзивное казино ===
 game_frame1 = tk.Frame(root)
 game_frame1.config(bg="gold")
 money_text1 = tk.Label(game_frame1, text=f"Билетов: {ticket}", font=("Arial", 25))
