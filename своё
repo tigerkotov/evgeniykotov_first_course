@@ -1,0 +1,36 @@
+import random
+import time
+
+arguments = [
+    "кот съел повестку",
+    "у меня плоскостопие",
+    "плохое зрение",
+    "аутизм"
+]
+
+def loading(text):
+    print(text, end="", flush=True)
+    for i in range(3):
+        time.sleep(1)
+        print(".", end="", flush=True)
+    print()
+
+loading("Взламываю военкомат")
+loading("Удаляю из базы данных")
+
+def loading2(text):
+    print(text, end="", flush=True)
+    for i in range(3):
+        time.sleep(1)
+        print(".", end="", flush=True)
+    print()
+
+print("\n\033[91mОшибка 403: нельзя удалить того, кого еще не призвали\033[0m\n")
+loading2("Запасной план")
+a = random.choice(arguments)
+print(a)
+
+if a == "аутизм":
+    print("Результат проверки: не годен")
+else:
+    print("Результат проверки: годен")
