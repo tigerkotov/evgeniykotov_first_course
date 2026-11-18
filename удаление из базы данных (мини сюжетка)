@@ -1,6 +1,7 @@
 import random
 import time
 import os
+import tkinter as tk
 arguments = [
     "кот съел повестку",
     "у меня плоскостопие",
@@ -47,7 +48,6 @@ def loading(text):
         print(".", end="", flush=True)
     print()
 
-import time
 
 def loading2(text):
     print(text, end="", flush=True)
@@ -57,13 +57,23 @@ def loading2(text):
     print("\r" + " " * (len(text) + 4), end="\r", flush=True) 
     print()
 
+def Error(text):
+    print(text, end="", flush=True)
+    error = "\n\033[91mОшибка 403: неполучилось удалить из базы данных\033[0m\n"
+    for i in error:
+        time.sleep(0.1)
+        print(i, end="", flush=True)
+    print()
+
 loading("Взламываю военкомат")
 loading("Удаляю из базы данных")
 
-print("\n\033[91mОшибка 403: неполучилось удалить из базы данных\033[0m\n")
+Error("")
 loading("Запасной план")
 a = random.choice(arguments)
 print(a)
+time.sleep(1)
+loading2("")
 
 if a == "Евгений":
     loading("Результат проверки")
@@ -75,21 +85,70 @@ else:
     print("Так, удаляю себя из базы… Ещё пара кликов — и меня как будто и не было")
     time.sleep(3)
     loading2("")
+    
     print("-А ну-ка, стой. Ты что там делаешь?")
-    time.sleep(3)
+    root = tk.Tk()
+    root.title("ГОДЕН")
+    root.geometry("700x500")
+    t_l = tk.Label(root, text="-А ну-ка, стой. Ты что там делаешь?", font=("Arial", 20))
+    t_l.pack(pady=50)
+    t_destroy1 = tk.Label(root, text="(Окно закроется самостоятельно через 10 секунд в целях безопасности)", font=("Arial", 10))
+    t_destroy1.pack(pady=70)
+    root.after(10000, root.destroy)
+    root.mainloop()
+    time.sleep(1)
     loading2("")
+    
     print("А? А вы кто? И я так… просто кеш чистил!")
-    time.sleep(3)
+    time.sleep(1)
     loading2("")
-    print("-Кэш, значит… А в логах у тебя совсем другая история. Собирайся, тебе повестка пришла. И это твой любимый дяденька майор.")
-    time.sleep(3)
+    
+    print("Кэш, значит… А в логах у тебя совсем другая история. Собирайся, тебе повестка пришла. И это твой любимый дяденька майор.")
+    root = tk.Tk()
+    root.title("ГОДЕН")
+    root.geometry("800x700")
+    t_l = tk.Label(root, text="Кэш, значит… А в логах у тебя совсем другая история.", font=("Arial", 20))
+    t_2 = tk.Label(root, text="Собирайся, тебе повестка пришла.", font=("Arial", 20))
+    t_3 = tk.Label(root, text="И это твой любимый дяденька майор.", font=("Arial", 20))
+    t_destroy1 = tk.Label(root, text="(Окно закроется самостоятельно через 10 секунд в целях безопасности)", font=("Arial", 10))
+    t_l.pack(pady=50)
+    t_2.pack(pady=52)
+    t_3.pack(pady=52)
+    t_destroy1.pack(pady=70)
+    root.after(10000, root.destroy)
+    root.mainloop()
+    time.sleep(1)
     loading2("")
+    
     print("Повестка? Но я же только кэш чистил!")
-    time.sleep(3)
+    time.sleep(1)
     loading2("")
-    print("-В комиссариате разберутся. И базу больше не трогай.")
-    time.sleep(3)
+    
+    print("В комиссариате разберутся. И базу больше не трогай.")
+    root = tk.Tk()
+    root.title("ГОДЕН")
+    root.geometry("700x500")
+    t_l = tk.Label(root, text="В комиссариате разберутся. И базу больше не трогай.", font=("Arial", 20))
+    t_l.pack(pady=65)
+    t_destroy1 = tk.Label(root, text="(Окно закроется самостоятельно через 10 секунд в целях безопасности)", font=("Arial", 10))
+    t_destroy1.pack(pady=70)
+    root.after(10000, root.destroy)
+    root.mainloop()
+    time.sleep(1)
     loading2("")
+    
+    
+    root = tk.Tk()
+    root.title("ГОДЕН")
+    root.geometry("5000x5000")
+    t_l = tk.Label(root, text="ГОДЕН", font=("Arial", 350))
+    t_l.pack(pady=50)
+    t_destroy1 = tk.Label(root, text="(Окно закроется самостоятельно через 10 секунд в целях безопасности)", font=("Arial", 10))
+    t_destroy1.pack(pady=70)
+    root.after(10000, root.destroy)
+    root.mainloop()
+
+
 
     print("""\033[32m
 ██████    ████     █████     ██████   ██   ██ 
@@ -143,5 +202,5 @@ else:
                 Оповещение произвел "__" ___________ 20__ г. <*>
                 (должность, подпись, инициал имени, фамилия должностного лица)""")
 
-print("Повестка успешно доставлена!")
-print(os.getcwd())
+    print("Повестка успешно доставлена!")
+    print(os.getcwd())
