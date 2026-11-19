@@ -2,6 +2,8 @@ import random
 import time
 import os
 import tkinter as tk
+import pygame
+import sys
 arguments = [
     "кот съел повестку",
     "у меня плоскостопие",
@@ -136,7 +138,159 @@ else:
     root.mainloop()
     time.sleep(1)
     loading2("")
-    
+
+
+    pygame.init()
+    screen = pygame.display.set_mode((800, 600))
+    pygame.display.set_caption("Моя первая игра")
+    clock = pygame.time.Clock()
+
+    heart_x = 400
+    heart_y = 380
+    speed = 4
+    player_hp = 1
+
+    game_mod = "boss"
+    arena = pygame.Rect(250, 300, 300, 180)
+
+    font = pygame.font.SysFont("arial", 25)
+
+    boss_name = "Дяденька Майор"
+    boss_hp = 100
+
+    bullet_x = random.randint(258, 542)
+    bullet_y = 310
+    bullet_speed = 5
+
+    running = True
+    font = pygame.font.SysFont("Consolas", 32)
+
+    bullets = []
+
+    last_bullet = 0
+    last_bullet1 = 0
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        
+        screen.fill((0, 0, 0))
+
+        keys = pygame.key.get_pressed()
+
+        current_time = pygame.time.get_ticks()
+
+        heart_rect = pygame.Rect(heart_x, heart_y, 15, 15)
+
+        if current_time - last_bullet >= 750:
+            bullet_x = random.randint(258, 542)
+            bullets.append([bullet_x, 310, 0, 4])
+            last_bullet = current_time
+
+
+        if current_time - last_bullet1 >= 1500:
+            skill = random.randint(1, 4)
+            if skill == 1:
+                bullets.append([400, 310, -3, 4])
+                bullets.append([400, 310, -1, 5])
+                bullets.append([400, 310, 0, 5])
+                bullets.append([400, 310, 1, 5])
+                bullets.append([400, 310, 3, 4])
+            if skill == 2:
+                bullets.append([400, 470, -3, -4])
+                bullets.append([400, 470, -1, -5])
+                bullets.append([400, 470, 0, -5])
+                bullets.append([400, 470, 1, -5])
+                bullets.append([400, 470, 3, -4])
+            if skill == 3:
+                bullets.append([250, 400, 3, -3])
+                bullets.append([250, 400, 4, -1])
+                bullets.append([250, 400, 5, 0])
+                bullets.append([250, 400, 4, 1])
+                bullets.append([250, 400, 3, 3])
+            if skill == 2:
+                bullets.append([540, 470, -3, -3])
+                bullets.append([540, 470, -4, -1])
+                bullets.append([540, 470, -5, 0])
+                bullets.append([540, 470, -4, 1])
+                bullets.append([540, 470, -3, 3])
+            last_bullet1 = current_time
+
+        bullet_y += bullet_speed
+
+
+        for bullet in bullets:
+            bullet[0] += bullet[2]
+            bullet[1] += bullet[3]
+
+        for bullet in bullets:
+            pygame.draw.circle(screen, (255, 255, 255), (bullet[0], bullet[1]), 8)
+        
+        bullets = [bullet for bullet in bullets if 250 <= bullet[0] <= 550 and 300 <= bullet[1] <= 480]
+
+
+        for bullet in bullets[:]:
+            bullet_rect = pygame.Rect(bullet[0] - 8, bullet[1] - 8, 16, 16)
+            if heart_rect.colliderect(bullet_rect):
+                player_hp -= 1
+                bullets.remove(bullet)
+
+        bullet_rect = pygame.Rect(bullet_x - 8, bullet_y - 8, 16, 16)
+
+
+
+
+
+
+        if keys[pygame.K_w]:
+            heart_y -= speed
+        
+        if keys[pygame.K_s]:
+            heart_y += speed
+
+        if keys[pygame.K_a]:
+            heart_x -= speed
+        if keys[pygame.K_d]:
+            heart_x += speed
+
+        if heart_x < 250:
+            heart_x = 250
+        if heart_x > 535:
+            heart_x = 535
+        if heart_y < 300:
+            heart_y = 300
+        if heart_y > 465:
+            heart_y = 465
+
+        if pygame.time.get_ticks() >= 25000:
+            print("Вы выйграли!")
+            sys.exit()
+            
+
+        if player_hp <= 0:
+            sys.exit()
+
+        pygame.draw.rect(screen, (255, 255, 255), arena, 3)
+        pygame.draw.rect(screen, (255, 0, 0), (heart_x, heart_y, 15, 15))
+
+        name_text = font.render(boss_name, True, (255, 255, 255))
+        hp_text = font.render("Hp: " + str(boss_hp), True, (255, 0, 0))
+
+        player_text = font.render("PLAYER HP: " + str(player_hp), True, (255, 255, 255))
+
+        screen.blit(name_text, (250, 100))
+        screen.blit(hp_text, (250, 140))
+        screen.blit(player_text, (450, 140))
+
+        pygame.draw.circle(screen, (255, 255, 255), (bullet_x, bullet_y), 10)
+
+        pygame.display.update()
+        clock.tick(90)
+        
+
+    pygame.quit()
+
     
     root = tk.Tk()
     root.title("ГОДЕН")
