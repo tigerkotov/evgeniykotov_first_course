@@ -1,4 +1,5 @@
 
+import random
 books = []
 print("""
 === ЧИТАТЕЛЬСКИЙ ДНЕВНИК ===
@@ -9,79 +10,109 @@ print("""
 5 — Поиск по названию
 6 — Статистика
 0 — Выход
+7 - Комманды (повторно появится этот текст)
 """)
-while True:
 
-    numbers = int(input("Выберите пункт меню: "))
+    
+def num1():
+    name = input("Введите название книги: ").strip()
 
-    if numbers == 1:
-        name = input("Введите название книги: ").strip()
-
-        if name == "":
-            print("Ошибка! Название не может быть пустым.")
-        else:
-            books.append(name)
-            print("Книга добавлена!")
-
-
-    elif numbers == 2:
-        if len(books) == 0:
-            print("Дневник пуст")
-        else:
-            for i in range(len(books)):
-                print(f"{i + 1}. {books[i]}")
-
-    elif numbers == 3:
-        if len(books) == 0:
-            print("Дневник пуст")
-        else:
-            for book in books[-5:]:
-                print(f"{len(book)}. {book}")
-
-
-    elif numbers == 4:
-        number = int(input("Введите номер книги: "))
-        if number < 1 or number > len(books):
-            print("Ошибка! Книги с таким номером нет.")
-        else:
-            new_name = input("Введите новое название: ").strip()
-
-            if new_name == "":
-                print("Ошибка! Название не может быть пустым.")
-            else:
-                books[number - 1] = new_name
-                print("Название изменено!")
-
-    elif numbers == 5:
-        if len(books) == 0:
-            print("Дневник пуст")
-        else:
-            search = input("Введите название или часть названия: ").strip().lower()
-
-            if search == "":
-                print("Ничего не найдено.")
-            else:
-                found = False
-
-                for i in range(len(books)):
-                    if search in books[i].lower():
-                        print(f"{i + 1}. {books[i]}")
-                        found = True
-
-                if not found:
-                    print("Ничего не найдено.")
-
-    elif numbers == 6:
-        if len(books) == 0:
-            print("Дневник пуст")
-        else:
-            print("Всего прочитано книг:", len(books))
-            print("Первая книга:", books[0])
-            print("Последняя книга:", books[-1])
-
-
-    elif numbers == 0:
-        break
-
+    if name == "":
+        print("Пустая строка.")
     else:
-        print("Ошибка! Такого номера нет.")
+        books.append(name)
+        print("Книга добавлена")
+
+
+def num2():
+    if len(books) == 0:
+        print("Дневник пуст")
+    else:
+        for i in range(len(books)):
+            print(f"{i + 1}. {books[i]}")
+
+def num3():
+    if len(books) == 0:
+        print("Дневник пуст")
+    else:
+        for book in books[-5:]:
+            print(f"{len(book)}. {book}")
+
+
+def num4():
+    number = int(input("Введите номер книги: "))
+    if number < 1 or number > len(books):
+        print("Книги с таким номером нет")
+    else:
+        new_name = input("Введите новое название: ").strip()
+
+        if new_name == "":
+            print("Пустая строка")
+        else:
+            books[number - 1] = new_name
+            print("Название изменено")
+
+def num5():
+    if len(books) == 0:
+        print("Дневник пуст")
+    else:
+        search = input("Введите название или часть названия: ").strip().lower()
+
+        if search == "":
+            print("Ничего не найдено")
+        else:
+            found = False
+
+            for i in range(len(books)):
+                if search in books[i].lower():
+                    print(f"{i + 1}. {books[i]}")
+                    found = True
+
+            if not found:
+                print("Пусто")
+
+def num6():
+    if len(books) == 0:
+        print("Дневник пуст")
+    else:
+        print("Всего прочитано книг:", len(books))
+        print("Первая книга:", books[0])
+        print("Последняя книга:", books[-1])
+
+def num7():
+
+    print("""
+=== ЧИТАТЕЛЬСКИЙ ДНЕВНИК ===
+1 — Добавить книгу
+2 — Показать все книги
+3 — Показать последние 5 прочитанных
+4 — Заменить название по номеру
+5 — Поиск по названию
+6 — Статистика
+0 — Выход""")
+        
+while True:
+    N = int(input("Напишите 1, если хотите чтобы я выбрал случайную комманду. Напишите 2, если хотите выбрать комманду сами: "))
+    if N == 1:
+        numbers = random.randint(1, 7)
+        print(f"пункт меню: {numbers}")
+    elif N == 2:
+        numbers = int(input("Выберите пункт меню: ")) 
+    if numbers == 1:   
+        num1()
+    elif numbers == 2:   
+        num2()
+    elif numbers == 3:   
+        num3()
+    elif numbers == 4:   
+        num4()
+    elif numbers == 5:   
+        num5()
+    elif numbers == 6:   
+        num6()
+    elif numbers == 7:   
+        num7()
+    elif numbers == 0:   
+        break
+    else:
+        print("Нет такого номера!")
