@@ -1,0 +1,1058 @@
+import math
+import random
+import tkinter as tk
+from tkinter import font as tkfont
+
+
+CLASSES = {
+    "Воин": {
+        "hp": 32,
+        "ac": 16,
+        "str": 3,
+        "dex": 1,
+        "int": 0,
+        "weapon": "Длинный меч (1d8)",
+        "die": 8,
+        "stat": "str",
+        "color": "#e06c75",
+        "desc": "Высокая защита (AC 16) и мощные удары ближнего боя.",
+    },
+    "Плут": {
+        "hp": 26,
+        "ac": 14,
+        "str": 1,
+        "dex": 4,
+        "int": 1,
+        "weapon": "Парные кинжалы (1d10)",
+        "die": 10,
+        "stat": "dex",
+        "color": "#98c379",
+        "desc": "Высокая ловкость (+4), легко вскрывает сундуки и обходит ловушки.",
+    },
+    "Маг": {
+        "hp": 22,
+        "ac": 12,
+        "str": 0,
+        "dex": 2,
+        "int": 4,
+        "weapon": "Огненный снаряд (1d12)",
+        "die": 12,
+        "stat": "int",
+        "color": "#61afef",
+        "desc": "Огромный магический урон (1d12) и бонус к тайным знаниям (+4).",
+    },
+}
+
+MONSTERS = [
+    {"name": "Гоблин-разведчик", "type": "goblin", "hp": 14, "ac": 12, "atk": 3, "dmg": 6, "xp": 25, "gold": 12},
+    {"name": "Скелет-страж", "type": "skeleton", "hp": 18, "ac": 13, "atk": 4, "dmg": 8, "xp": 35, "gold": 18},
+    {"name": "Орк-берсерк", "type": "orc", "hp": 24, "ac": 14, "atk": 5, "dmg": 10, "xp": 50, "gold": 25},
+    {"name": "Тёмный культист", "type": "cultist", "hp": 20, "ac": 13, "atk": 5, "dmg": 9, "xp": 45, "gold": 22},
+]
+
+BOSS = {"name": "ДРЕВНИЙ ЛИЧ АЗАРОТ", "type": "lich", "hp": 45, "ac": 16, "atk": 6, "dmg": 12, "xp": 150, "gold": 100}
+
+
+class AnimatedDungeonApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Подземелье d20 — Анимированная RPG")
+        self.root.geometry("960x720")
+        self.root.configure(bg="#12131a")
+        self.root.resizable(False, False)
+
+        self.bg_main = "#12131a"
+        self.bg_panel = "#1b1d29"
+        self.bg_card = "#252838"
+        self.fg_text = "#e6e8f0"
+        self.fg_muted = "#8b92a8"
+        self.accent_gold = "#e5c07b"
+        self.accent_red = "#e06c75"
+        self.accent_green = "#98c379"
+        self.accent_blue = "#61afef"
+        self.accent_purple = "#c678dd"
+
+        self.font_title = tkfont.Font(family="Georgia", size=17, weight="bold")
+        self.font_sub = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        self.font_body = tkfont.Font(family="Segoe UI", size=10)
+        self.font_log = tkfont.Font(family="Consolas", size=10)
+
+        self.player = None
+        self.room = 1
+        self.room_type = "combat"  # combat, chest, trap, altar
+        self.enemy = None
+        self.room_cleared = False
+        self.rolling = False
+
+        # Состояние анимаций сцены и кубика
+        self.tick = 0
+        self.hero_offset_x = 0.0
+        self.enemy_offset_x = 0.0
+        self.enemy_shake = 0
+        self.hero_shake = 0
+        self.room_transition_alpha = 0.0
+        self.vfx_list = []       # вспышки ударов, заклинаний, искры
+        self.floating_texts = [] # всплывающий урон и хил
+        self.torches = [(70, 95), (560, 95)]
+        self.dice_angle = 0.0
+        self.dice_val = 20
+        self.dice_color = self.accent_gold
+
+        self.show_class_selection()
+        self.animation_loop()
+
+    def clear_window(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    # ---------------- ЭКРАН ВЫБОРА КЛАССА ----------------
+    def show_class_selection(self):
+        self.clear_window()
+        frame = tk.Frame(self.root, bg=self.bg_main)
+        frame.pack(expand=True, fill="both", padx=40, pady=35)
+
+        tk.Label(
+            frame,
+            text="⚔ ПОДЗЕМЕЛЬЕ D20 ⚔",
+            font=self.font_title,
+            fg=self.accent_gold,
+            bg=self.bg_main,
+        ).pack(pady=(0, 8))
+
+        tk.Label(
+            frame,
+            text="Выберите героя для спуска в анимированное подземелье:",
+            font=self.font_body,
+            fg=self.fg_muted,
+            bg=self.bg_main,
+        ).pack(pady=(0, 25))
+
+        cards_frame = tk.Frame(frame, bg=self.bg_main)
+        cards_frame.pack(expand=True, fill="both")
+
+        for cls_name, data in CLASSES.items():
+            card = tk.Frame(
+                cards_frame,
+                bg=self.bg_panel,
+                highlightbackground=data["color"],
+                highlightthickness=2,
+                padx=18,
+                pady=18,
+            )
+            card.pack(side="left", expand=True, fill="both", padx=10)
+
+            tk.Label(
+                card,
+                text=cls_name.upper(),
+                font=self.font_title,
+                fg=data["color"],
+                bg=self.bg_panel,
+            ).pack(pady=(0, 10))
+
+            stats_txt = (
+                f"Здоровье (HP): {data['hp']}\n"
+                f"Класс Брони (AC): {data['ac']}\n"
+                f"Оружие: {data['weapon']}\n\n"
+                f"СИЛ: +{data['str']}  |  ЛОВ: +{data['dex']}  |  ИНТ: +{data['int']}"
+            )
+            tk.Label(
+                card,
+                text=stats_txt,
+                font=self.font_sub,
+                fg=self.fg_text,
+                bg=self.bg_panel,
+                justify="center",
+            ).pack(pady=8)
+
+            tk.Label(
+                card,
+                text=data["desc"],
+                font=self.font_body,
+                fg=self.fg_muted,
+                bg=self.bg_panel,
+                wraplength=220,
+                justify="center",
+            ).pack(pady=10)
+
+            tk.Button(
+                card,
+                text=f"Играть за {cls_name}",
+                font=self.font_sub,
+                bg=data["color"],
+                fg="#12131a",
+                activebackground=self.fg_text,
+                relief="flat",
+                padx=15,
+                pady=8,
+                cursor="hand2",
+                command=lambda c=cls_name: self.start_game(c),
+            ).pack(side="bottom", fill="x", pady=(10, 0))
+
+    # ---------------- ИНИЦИАЛИЗАЦИЯ ИГРЫ ----------------
+    def start_game(self, cls_name):
+        base = CLASSES[cls_name]
+        self.player = {
+            "class": cls_name,
+            "hp": base["hp"],
+            "max_hp": base["hp"],
+            "ac": base["ac"],
+            "str": base["str"],
+            "dex": base["dex"],
+            "int": base["int"],
+            "die": base["die"],
+            "stat": base["stat"],
+            "weapon": base["weapon"],
+            "color": base["color"],
+            "level": 1,
+            "xp": 0,
+            "next_xp": 60,
+            "gold": 15,
+            "potions": 2,
+        }
+        self.room = 1
+        self.vfx_list.clear()
+        self.floating_texts.clear()
+        self.build_game_ui()
+        self.generate_room(first=True)
+
+    def build_game_ui(self):
+        self.clear_window()
+
+        # Верхняя панель статуса
+        top_bar = tk.Frame(self.root, bg=self.bg_panel, pady=8, padx=16)
+        top_bar.pack(fill="x")
+
+        self.lbl_hero = tk.Label(top_bar, font=self.font_sub, fg=self.accent_gold, bg=self.bg_panel)
+        self.lbl_hero.pack(side="left")
+
+        self.lbl_stats = tk.Label(top_bar, font=self.font_body, fg=self.fg_text, bg=self.bg_panel)
+        self.lbl_stats.pack(side="right")
+
+        # Основной контейнер (слева сцена + управление, справа кубик + журнал)
+        body = tk.Frame(self.root, bg=self.bg_main)
+        body.pack(expand=True, fill="both", padx=14, pady=10)
+
+        left_col = tk.Frame(body, bg=self.bg_main, width=630)
+        left_col.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        # Анимированный холст комнаты и персонажей
+        self.scene_canvas = tk.Canvas(
+            left_col,
+            width=630,
+            height=270,
+            bg="#0d0e14",
+            highlightbackground="#2c3144",
+            highlightthickness=2,
+        )
+        self.scene_canvas.pack(fill="x")
+
+        # Описание комнаты и кнопки действий
+        action_box = tk.Frame(left_col, bg=self.bg_panel, padx=14, pady=12)
+        action_box.pack(fill="both", expand=True, pady=(10, 0))
+
+        self.lbl_room_title = tk.Label(
+            action_box, font=self.font_title, fg=self.accent_gold, bg=self.bg_panel, anchor="w"
+        )
+        self.lbl_room_title.pack(fill="x")
+
+        self.lbl_room_desc = tk.Label(
+            action_box,
+            font=self.font_body,
+            fg=self.fg_text,
+            bg=self.bg_panel,
+            wraplength=590,
+            justify="left",
+            anchor="w",
+        )
+        self.lbl_room_desc.pack(fill="x", pady=(6, 12))
+
+        self.btn_frame = tk.Frame(action_box, bg=self.bg_panel)
+        self.btn_frame.pack(fill="x", side="bottom")
+
+        # Правая колонка: Анимированный кубик d20 и журнал боя
+        right_col = tk.Frame(body, bg=self.bg_panel, width=290, padx=12, pady=10)
+        right_col.pack(side="right", fill="y")
+        right_col.pack_propagate(False)
+
+        tk.Label(
+            right_col, text="БРОСОК D20", font=self.font_sub, fg=self.accent_gold, bg=self.bg_panel
+        ).pack()
+
+        self.dice_canvas = tk.Canvas(
+            right_col, width=150, height=145, bg=self.bg_panel, highlightthickness=0
+        )
+        self.dice_canvas.pack(pady=4)
+
+        self.lbl_dice_formula = tk.Label(
+            right_col,
+            text="Готов к броску",
+            font=self.font_sub,
+            fg=self.fg_muted,
+            bg=self.bg_panel,
+            wraplength=260,
+        )
+        self.lbl_dice_formula.pack(pady=(0, 8))
+
+        tk.Label(
+            right_col, text="ЖУРНАЛ СОБЫТИЙ", font=self.font_sub, fg=self.fg_muted, bg=self.bg_panel, anchor="w"
+        ).pack(fill="x")
+
+        self.log_box = tk.Text(
+            right_col,
+            bg="#0e1017",
+            fg=self.fg_text,
+            font=self.font_log,
+            relief="flat",
+            wrap="word",
+            state="disabled",
+            padx=8,
+            pady=8,
+        )
+        self.log_box.pack(expand=True, fill="both", pady=(4, 0))
+        for tag, col in [
+            ("crit", self.accent_green),
+            ("fail", self.accent_red),
+            ("info", self.accent_blue),
+            ("gold", self.accent_gold),
+            ("enemy", "#d19a66"),
+        ]:
+            self.log_box.tag_config(tag, foreground=col)
+
+    def log(self, text, tag=None):
+        self.log_box.configure(state="normal")
+        self.log_box.insert("end", text + "\n", tag)
+        self.log_box.see("end")
+        self.log_box.configure(state="disabled")
+
+    def update_hud(self):
+        p = self.player
+        self.lbl_hero.configure(
+            text=f"{p['class']} (Ур. {p['level']})  |  HP: {p['hp']}/{p['max_hp']}  |  AC: {p['ac']}"
+        )
+        self.lbl_stats.configure(
+            text=f"СИЛ +{p['str']}  ЛОВ +{p['dex']}  ИНТ +{p['int']}   |   Золото: {p['gold']}   |   Зелья: {p['potions']}"
+        )
+
+    # ---------------- ГЕНЕРАЦИЯ КОМНАТ ----------------
+    def generate_room(self, first=False):
+        self.room_cleared = False
+        self.enemy = None
+        self.hero_offset_x = -80.0 if not first else 0.0
+        self.enemy_offset_x = 80.0
+        self.room_transition_alpha = 1.0 if not first else 0.0
+
+        if self.room % 5 == 0:
+            self.room_type = "combat"
+            self.enemy = BOSS.copy()
+            self.lbl_room_title.configure(text=f"Комната {self.room}: Тронный зал Лича")
+            self.lbl_room_desc.configure(
+                text=f"Перед вами парит {self.enemy['name']} (HP {self.enemy['hp']}, AC {self.enemy['ac']})! Воздух пропитан некромантией."
+            )
+            self.log(f"=== КОМНАТА {self.room}: БОСС {self.enemy['name']} ===", "fail")
+        else:
+            self.room_type = random.choices(["combat", "chest", "trap", "altar"], weights=[55, 18, 15, 12])[0]
+            if self.room_type == "combat":
+                base = random.choice(MONSTERS).copy()
+                scale = (self.room - 1) // 3
+                base["hp"] += scale * 4
+                base["max_hp"] = base["hp"]
+                base["ac"] += min(3, scale // 2)
+                base["dmg"] += scale
+                self.enemy = base
+                self.lbl_room_title.configure(text=f"Комната {self.room}: Засада в катакомбах")
+                self.lbl_room_desc.configure(
+                    text=f"Из тени выходит {self.enemy['name']} (HP {self.enemy['hp']}, AC {self.enemy['ac']}). Приготовьтесь к бою!"
+                )
+                self.log(f"--- Комната {self.room}: Враг {self.enemy['name']} ---", "enemy")
+            elif self.room_type == "chest":
+                self.lbl_room_title.configure(text=f"Комната {self.room}: Запертый реликварий")
+                self.lbl_room_desc.configure(
+                    text="В центре зала стоит окованный железом сундук с древним замком (Сложность DC 13)."
+                )
+                self.log(f"--- Комната {self.room}: Запертый сундук ---", "gold")
+            elif self.room_type == "trap":
+                self.lbl_room_title.configure(text=f"Комната {self.room}: Зал маятников и шипов")
+                self.lbl_room_desc.configure(
+                    text="Плиты под ногами зловеще проседают! Требуется спасбросок Ловкости (DC 13)."
+                )
+                self.log(f"--- Комната {self.room}: Ловушка! ---", "fail")
+            else:
+                self.lbl_room_title.configure(text=f"Комната {self.room}: Рунический алтарь")
+                self.lbl_room_desc.configure(
+                    text="Древний обелиск пульсирует синим светом. Проверка Интеллекта (DC 12) раскроет его дар."
+                )
+                self.log(f"--- Комната {self.room}: Магический алтарь ---", "info")
+
+        if self.enemy and "max_hp" not in self.enemy:
+            self.enemy["max_hp"] = self.enemy["hp"]
+
+        self.update_hud()
+        self.render_buttons()
+
+    def render_buttons(self):
+        for w in self.btn_frame.winfo_children():
+            w.destroy()
+
+        state = "disabled" if self.rolling else "normal"
+
+        if self.player["hp"] <= 0:
+            tk.Button(
+                self.btn_frame,
+                text="Начать новый поход",
+                font=self.font_sub,
+                bg=self.accent_red,
+                fg="#12131a",
+                relief="flat",
+                padx=14,
+                pady=8,
+                command=self.show_class_selection,
+            ).pack(side="left")
+            return
+
+        if self.room_cleared:
+            tk.Button(
+                self.btn_frame,
+                text="Идти в следующую комнату ➔",
+                font=self.font_sub,
+                bg=self.accent_green,
+                fg="#12131a",
+                relief="flat",
+                padx=16,
+                pady=8,
+                state=state,
+                command=self.next_room,
+            ).pack(side="left", padx=(0, 8))
+        else:
+            if self.room_type == "combat":
+                tk.Button(
+                    self.btn_frame,
+                    text=f"⚔ Атаковать ({self.player['weapon']})",
+                    font=self.font_sub,
+                    bg=self.accent_red,
+                    fg="#12131a",
+                    relief="flat",
+                    padx=14,
+                    pady=8,
+                    state=state,
+                    command=self.action_attack,
+                ).pack(side="left", padx=(0, 8))
+            elif self.room_type == "chest":
+                tk.Button(
+                    self.btn_frame,
+                    text="🗝 Взломать замок (ЛОВ, DC 13)",
+                    font=self.font_sub,
+                    bg=self.accent_gold,
+                    fg="#12131a",
+                    relief="flat",
+                    padx=14,
+                    pady=8,
+                    state=state,
+                    command=self.action_chest,
+                ).pack(side="left", padx=(0, 8))
+                tk.Button(
+                    self.btn_frame,
+                    text="Пройти мимо",
+                    font=self.font_body,
+                    bg=self.bg_card,
+                    fg=self.fg_text,
+                    relief="flat",
+                    padx=12,
+                    pady=8,
+                    state=state,
+                    command=self.skip_room,
+                ).pack(side="left", padx=(0, 8))
+            elif self.room_type == "trap":
+                tk.Button(
+                    self.btn_frame,
+                    text="⚡ Спасбросок Ловкости (DC 13)",
+                    font=self.font_sub,
+                    bg=self.accent_blue,
+                    fg="#12131a",
+                    relief="flat",
+                    padx=14,
+                    pady=8,
+                    state=state,
+                    command=self.action_trap,
+                ).pack(side="left", padx=(0, 8))
+            elif self.room_type == "altar":
+                tk.Button(
+                    self.btn_frame,
+                    text="✨ Изучить руны (ИНТ, DC 12)",
+                    font=self.font_sub,
+                    bg=self.accent_purple,
+                    fg="#12131a",
+                    relief="flat",
+                    padx=14,
+                    pady=8,
+                    state=state,
+                    command=self.action_altar,
+                ).pack(side="left", padx=(0, 8))
+                tk.Button(
+                    self.btn_frame,
+                    text="Не трогать",
+                    font=self.font_body,
+                    bg=self.bg_card,
+                    fg=self.fg_text,
+                    relief="flat",
+                    padx=12,
+                    pady=8,
+                    state=state,
+                    command=self.skip_room,
+                ).pack(side="left", padx=(0, 8))
+
+        if self.player["potions"] > 0 and self.player["hp"] < self.player["max_hp"]:
+            tk.Button(
+                self.btn_frame,
+                text=f"🧪 Зелье ({self.player['potions']})",
+                font=self.font_body,
+                bg=self.bg_card,
+                fg=self.accent_green,
+                relief="flat",
+                padx=12,
+                pady=8,
+                state=state,
+                command=self.use_potion,
+            ).pack(side="right")
+
+    # ---------------- АНИМАЦИЯ КУБИКА D20 ----------------
+    def roll_d20_animated(self, mod, target_dc, label, callback):
+        self.rolling = True
+        self.render_buttons()
+        final_roll = random.randint(1, 20)
+        total = final_roll + mod
+        steps = 16
+
+        def step(i):
+            if i < steps:
+                self.dice_val = random.randint(1, 20)
+                self.dice_angle += 0.55 * (1.0 - i / (steps + 3))
+                self.dice_color = self.accent_blue
+                self.lbl_dice_formula.configure(text=f"{label}...", fg=self.fg_muted)
+                delay = int(28 + (i ** 1.6) * 2.5)
+                self.root.after(delay, lambda: step(i + 1))
+            else:
+                self.dice_val = final_roll
+                if final_roll == 20:
+                    self.dice_color = self.accent_green
+                elif final_roll == 1:
+                    self.dice_color = self.accent_red
+                else:
+                    self.dice_color = self.accent_gold
+
+                sign = f"+{mod}" if mod >= 0 else str(mod)
+                self.lbl_dice_formula.configure(
+                    text=f"d20 ({final_roll}) {sign} = {total}  [Цель: {target_dc}]",
+                    fg=self.dice_color,
+                )
+                self.rolling = False
+                callback(final_roll, total)
+                self.render_buttons()
+
+        step(0)
+
+    # ---------------- ДЕЙСТВИЯ И БОЕВЫЕ АНИМАЦИИ ----------------
+    def spawn_vfx(self, x, y, kind, color):
+        self.vfx_list.append({"x": x, "y": y, "kind": kind, "color": color, "life": 14, "max_life": 14})
+
+    def spawn_floating_text(self, x, y, text, color):
+        self.floating_texts.append({"x": x, "y": y, "text": text, "color": color, "life": 28})
+
+    def action_attack(self):
+        p = self.player
+        mod = p[p["stat"]]
+        ac = self.enemy["ac"]
+
+        def on_roll(roll, total):
+            # Рывок героя вперёд
+            self.hero_offset_x = 55.0
+            if roll == 1:
+                self.log("КРИТИЧЕСКИЙ ПРОВАЛ (1)! Вы споткнулись и промахнулись.", "fail")
+                self.spawn_floating_text(440, 120, "ПРОМАХ!", self.accent_red)
+                self.root.after(450, self.enemy_turn)
+                return
+
+            if roll == 20 or total >= ac:
+                dmg = random.randint(1, p["die"]) + mod
+                if roll == 20:
+                    dmg *= 2
+                    self.log(f"НАТУРАЛЬНАЯ 20! Сокрушительный удар на {dmg} урона!", "crit")
+                    self.spawn_vfx(445, 165, "crit", self.accent_gold)
+                    self.spawn_floating_text(445, 105, f"КРИТ -{dmg}!", self.accent_gold)
+                else:
+                    self.log(f"Попадание ({total} vs AC {ac})! Нанесено {dmg} урона.", "crit")
+                    vfx_kind = "magic" if p["class"] == "Маг" else "slash"
+                    self.spawn_vfx(445, 165, vfx_kind, p["color"])
+                    self.spawn_floating_text(445, 110, f"-{dmg}", self.accent_green)
+
+                self.enemy["hp"] = max(0, self.enemy["hp"] - dmg)
+                self.enemy_shake = 10
+
+                if self.enemy["hp"] <= 0:
+                    self.win_combat()
+                else:
+                    self.root.after(550, self.enemy_turn)
+            else:
+                self.log(f"Промах ({total} против AC {ac}). Броня врага выдержала удар.", "info")
+                self.spawn_floating_text(445, 115, "БЛОК", self.fg_muted)
+                self.root.after(450, self.enemy_turn)
+
+        self.roll_d20_animated(mod, ac, "Атака", on_roll)
+
+    def enemy_turn(self):
+        if not self.enemy or self.enemy["hp"] <= 0:
+            return
+        self.enemy_offset_x = -55.0
+        roll = random.randint(1, 20)
+        total = roll + self.enemy["atk"]
+        if roll == 20 or (roll != 1 and total >= self.player["ac"]):
+            dmg = random.randint(2, self.enemy["dmg"])
+            if roll == 20:
+                dmg = int(dmg * 1.5)
+            self.player["hp"] = max(0, self.player["hp"] - dmg)
+            self.hero_shake = 10
+            self.spawn_vfx(185, 165, "slash", self.accent_red)
+            self.spawn_floating_text(185, 110, f"-{dmg}", self.accent_red)
+            self.log(f"{self.enemy['name']} бьёт ({total} vs AC {self.player['ac']}) и наносит {dmg} урона!", "fail")
+        else:
+            self.spawn_floating_text(185, 115, "УКЛОНЕНИЕ", self.accent_blue)
+            self.log(f"{self.enemy['name']} атакует ({total}), но вы уклонились!", "info")
+
+        self.update_hud()
+        if self.player["hp"] <= 0:
+            self.lbl_room_title.configure(text="ПОРАЖЕНИЕ В ПОДЗЕМЕЛЬЕ")
+            self.lbl_room_desc.configure(text=f"Вы пали на {self.room}-й комнате от руки {self.enemy['name']}.")
+            self.log("Ваш герой пал...", "fail")
+        self.render_buttons()
+
+    def win_combat(self):
+        xp = self.enemy["xp"]
+        gold = self.enemy["gold"]
+        self.player["xp"] += xp
+        self.player["gold"] += gold
+        self.log(f"Победа! Получено +{xp} XP и +{gold} золота.", "gold")
+        self.spawn_floating_text(445, 95, f"+{gold} золота", self.accent_gold)
+        self.check_level_up()
+        self.room_cleared = True
+        self.lbl_room_desc.configure(text=f"{self.enemy['name']} повержен! Путь дальше открыт.")
+        self.update_hud()
+        self.render_buttons()
+
+    def action_chest(self):
+        mod = self.player["dex"]
+        def on_roll(roll, total):
+            self.hero_offset_x = 40.0
+            if roll == 20 or total >= 13:
+                gold = random.randint(20, 40)
+                self.player["gold"] += gold
+                self.spawn_vfx(445, 180, "magic", self.accent_gold)
+                self.spawn_floating_text(445, 120, f"+{gold} золота!", self.accent_gold)
+                if random.random() < 0.45:
+                    self.player["potions"] += 1
+                    self.log(f"Замок вскрыт ({total})! Найдено {gold} золота и зелье лечения!", "crit")
+                else:
+                    self.log(f"Замок вскрыт ({total})! Внутри {gold} золотых монет.", "gold")
+            elif roll == 1:
+                dmg = random.randint(3, 6)
+                self.player["hp"] = max(0, self.player["hp"] - dmg)
+                self.hero_shake = 10
+                self.spawn_vfx(185, 165, "slash", self.accent_red)
+                self.spawn_floating_text(185, 110, f"-{dmg}", self.accent_red)
+                self.log(f"Критическая неудача (1)! Сработала игла с ядом: -{dmg} HP.", "fail")
+            else:
+                self.log(f"Отмычка застряла ({total} против DC 13). Сундук не поддался.", "info")
+            self.room_cleared = True
+            self.update_hud()
+            self.render_buttons()
+
+        self.roll_d20_animated(mod, 13, "Взлом замка", on_roll)
+
+    def action_trap(self):
+        mod = self.player["dex"]
+        def on_roll(roll, total):
+            self.hero_offset_x = 45.0
+            if roll == 20 or total >= 13:
+                self.spawn_floating_text(220, 110, "ЛОВКИЙ РЫВОК!", self.accent_green)
+                self.log(f"Успех ({total} vs DC 13)! Вы акробатически проскочили мимо лезвий.", "crit")
+            else:
+                dmg = random.randint(4, 9)
+                self.player["hp"] = max(0, self.player["hp"] - dmg)
+                self.hero_shake = 12
+                self.spawn_vfx(220, 165, "slash", self.accent_red)
+                self.spawn_floating_text(220, 110, f"-{dmg} HP", self.accent_red)
+                self.log(f"Провал ({total} vs DC 13)! Лезвие задело вас на {dmg} урона.", "fail")
+            self.room_cleared = True
+            self.update_hud()
+            self.render_buttons()
+
+        self.roll_d20_animated(mod, 13, "Спасбросок Ловкости", on_roll)
+
+    def action_altar(self):
+        mod = self.player["int"]
+        def on_roll(roll, total):
+            if roll == 20 or total >= 12:
+                heal = random.randint(8, 14)
+                self.player["hp"] = min(self.player["max_hp"], self.player["hp"] + heal)
+                self.player["xp"] += 25
+                self.spawn_vfx(185, 160, "magic", self.accent_purple)
+                self.spawn_floating_text(185, 105, f"+{heal} HP / +25 XP", self.accent_purple)
+                self.log(f"Тайна рун раскрыта ({total})! Восстановлено {heal} HP и получено +25 XP.", "crit")
+                self.check_level_up()
+            else:
+                self.log(f"Символы неясны ({total} vs DC 12). Алтарь погас.", "info")
+            self.room_cleared = True
+            self.update_hud()
+            self.render_buttons()
+
+        self.roll_d20_animated(mod, 12, "Тайные знания", on_roll)
+
+    def use_potion(self):
+        if self.player["potions"] <= 0:
+            return
+        self.player["potions"] -= 1
+        heal = random.randint(1, 8) + 4
+        self.player["hp"] = min(self.player["max_hp"], self.player["hp"] + heal)
+        self.spawn_vfx(185, 165, "magic", self.accent_green)
+        self.spawn_floating_text(185, 105, f"+{heal} HP", self.accent_green)
+        self.log(f"Вы выпили зелье лечения и восстановили {heal} HP.", "crit")
+        self.update_hud()
+        self.render_buttons()
+
+    def skip_room(self):
+        self.room_cleared = True
+        self.log("Вы решили не рисковать и двигаться дальше.", "info")
+        self.render_buttons()
+
+    def next_room(self):
+        self.room += 1
+        self.generate_room(first=False)
+
+    def check_level_up(self):
+        p = self.player
+        if p["xp"] >= p["next_xp"]:
+            p["xp"] -= p["next_xp"]
+            p["level"] += 1
+            p["next_xp"] = int(p["next_xp"] * 1.5)
+            p["max_hp"] += 6
+            p["hp"] = p["max_hp"]
+            p[p["stat"]] += 1
+            self.spawn_vfx(185, 155, "crit", self.accent_gold)
+            self.spawn_floating_text(185, 85, "НОВЫЙ УРОВЕНЬ!", self.accent_gold)
+            self.log(f"★ ПОВЫШЕНИЕ УРОВНЯ ({p['level']})! Макс. HP +6, основная характеристика +1!", "gold")
+
+    # ---------------- ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ ----------------
+    def animation_loop(self):
+        self.tick += 1
+        # Плавное возвращение персонажей на исходные позиции
+        self.hero_offset_x *= 0.78
+        self.enemy_offset_x *= 0.78
+        if abs(self.hero_offset_x) < 0.3:
+            self.hero_offset_x = 0.0
+        if abs(self.enemy_offset_x) < 0.3:
+            self.enemy_offset_x = 0.0
+
+        if self.enemy_shake > 0:
+            self.enemy_shake -= 1
+        if self.hero_shake > 0:
+            self.hero_shake -= 1
+        if self.room_transition_alpha > 0:
+            self.room_transition_alpha = max(0.0, self.room_transition_alpha - 0.08)
+
+        # Обновление визуальных эффектов и всплывающего текста
+        for v in self.vfx_list:
+            v["life"] -= 1
+        self.vfx_list = [v for v in self.vfx_list if v["life"] > 0]
+
+        for ft in self.floating_texts:
+            ft["y"] -= 1.3
+            ft["life"] -= 1
+        self.floating_texts = [ft for ft in self.floating_texts if ft["life"] > 0]
+
+        if self.player is not None and hasattr(self, "scene_canvas"):
+            self.draw_scene()
+            self.draw_d20()
+
+        self.root.after(33, self.animation_loop)
+
+    # ---------------- ОТРИСОВКА СЦЕНЫ ПОДЗЕМЕЛЬЯ ----------------
+    def draw_scene(self):
+        c = self.scene_canvas
+        c.delete("all")
+        w, h = 630, 270
+        t = self.tick
+
+        # Каменная стена и арки подземелья
+        c.create_rectangle(0, 0, w, 215, fill="#151722", outline="")
+        for row in range(0, 215, 36):
+            offset = 30 if (row // 36) % 2 == 0 else 0
+            c.create_line(0, row, w, row, fill="#1f2233", width=2)
+            for col in range(-offset, w, 60):
+                c.create_line(col, row, col, row + 36, fill="#1f2233", width=2)
+
+        # Декоративные сводчатые арки на заднем плане
+        for ax in (160, 315, 470):
+            c.create_arc(ax - 55, 35, ax + 55, 210, start=0, extent=180, fill="#10121b", outline="#282c40", width=3)
+            c.create_rectangle(ax - 55, 120, ax + 55, 215, fill="#10121b", outline="")
+
+        # Каменный пол
+        c.create_rectangle(0, 215, w, h, fill="#1f2330", outline="#32384d", width=2)
+        for fx in range(0, w, 45):
+            c.create_line(fx, 215, fx - 18, h, fill="#2b3042", width=2)
+
+        # Мерцающие настенные факелы
+        for idx, (tx, ty) in enumerate(self.torches):
+            flicker = math.sin(t * 0.35 + idx * 2.1) * 4
+            glow_r = 46 + flicker * 2
+            c.create_oval(tx - glow_r, ty - glow_r, tx + glow_r, ty + glow_r, fill="#261c16", outline="")
+            c.create_rectangle(tx - 4, ty, tx + 4, ty + 28, fill="#5c4033", outline="")
+            # Языки пламени
+            c.create_polygon(
+                tx - 9, ty + 2,
+                tx + flicker * 0.5, ty - 22 - flicker,
+                tx + 9, ty + 2,
+                fill="#e06c75", outline="", smooth=True
+            )
+            c.create_polygon(
+                tx - 5, ty + 2,
+                tx - flicker * 0.4, ty - 14 - flicker * 0.6,
+                tx + 5, ty + 2,
+                fill="#e5c07b", outline="", smooth=True
+            )
+
+        # Отрисовка Героя (слева)
+        shake_hx = random.randint(-5, 5) if self.hero_shake > 0 else 0
+        hx = 185 + self.hero_offset_x + shake_hx
+        hy = 215
+        self.draw_hero(c, hx, hy, t)
+
+        # Отрисовка содержимого комнаты (справа)
+        shake_ex = random.randint(-6, 6) if self.enemy_shake > 0 else 0
+        ex = 445 + self.enemy_offset_x + shake_ex
+        ey = 215
+
+        if self.room_type == "combat" and self.enemy and self.enemy["hp"] > 0:
+            self.draw_enemy(c, ex, ey, self.enemy, t)
+        elif self.room_type == "chest":
+            self.draw_chest(c, ex, ey, self.room_cleared)
+        elif self.room_type == "trap":
+            self.draw_trap(c, 355, ey, t)
+        elif self.room_type == "altar":
+            self.draw_altar(c, ex, ey, t, self.room_cleared)
+
+        # Визуальные эффекты ударов / заклинаний
+        for v in self.vfx_list:
+            ratio = v["life"] / v["max_life"]
+            r = (1.0 - ratio) * 48 + 10
+            vx, vy = v["x"], v["y"]
+            if v["kind"] == "slash":
+                c.create_line(vx - r, vy - r, vx + r, vy + r, fill=v["color"], width=max(1, int(6 * ratio)))
+                c.create_line(vx - r * 0.6, vy + r * 0.8, vx + r * 0.8, vy - r * 0.6, fill="#ffffff", width=max(1, int(3 * ratio)))
+            elif v["kind"] == "magic":
+                c.create_oval(vx - r, vy - r, vx + r, vy + r, outline=v["color"], width=max(1, int(4 * ratio)))
+                c.create_oval(vx - r * 0.5, vy - r * 0.5, vx + r * 0.5, vy + r * 0.5, outline="#ffffff", width=2)
+            else:
+                for a in range(0, 360, 45):
+                    rad = math.radians(a + t * 8)
+                    c.create_line(
+                        vx, vy,
+                        vx + math.cos(rad) * r * 1.3,
+                        vy + math.sin(rad) * r * 1.3,
+                        fill=v["color"], width=3
+                    )
+
+        # Всплывающие цифры урона / лечения
+        for ft in self.floating_texts:
+            c.create_text(
+                ft["x"], ft["y"], text=ft["text"], font=self.font_sub, fill=ft["color"]
+            )
+
+        # Эффект перехода в новую комнату (затемнение по краям)
+        if self.room_transition_alpha > 0:
+            bar_w = int(w * 0.5 * self.room_transition_alpha)
+            c.create_rectangle(0, 0, bar_w, h, fill="#090a0f", outline="")
+            c.create_rectangle(w - bar_w, 0, w, h, fill="#090a0f", outline="")
+
+    def draw_hero(self, c, x, y, t):
+        bob = math.sin(t * 0.16) * 3.0  # Дыхание / покачивание
+        cls = self.player["class"]
+        col = self.player["color"]
+
+        # Тень
+        c.create_oval(x - 24, y - 6, x + 24, y + 6, fill="#090a0f", outline="")
+
+        # Плащ
+        cape_wave = math.sin(t * 0.2) * 5
+        c.create_polygon(
+            x - 10, y - 62 + bob,
+            x - 28 + cape_wave, y - 10,
+            x + 8, y - 12,
+            fill="#2c3144", outline=""
+        )
+
+        # Ноги
+        c.create_line(x - 8, y - 28 + bob, x - 10, y - 2, fill="#abb2bf", width=5)
+        c.create_line(x + 8, y - 28 + bob, x + 10, y - 2, fill="#abb2bf", width=5)
+
+        # Тело / Броня
+        c.create_rectangle(x - 14, y - 64 + bob, x + 14, y - 28 + bob, fill=col, outline="#12131a", width=2)
+
+        # Голова
+        c.create_oval(x - 12, y - 88 + bob, x + 12, y - 64 + bob, fill="#f0d5b8", outline="#12131a", width=2)
+
+        # Классовый головной убор и оружие
+        if cls == "Воин":
+            # Шлем с гребнем и меч
+            c.create_arc(x - 13, y - 92 + bob, x + 13, y - 68 + bob, start=0, extent=180, fill="#8b92a8", outline="#12131a", width=2)
+            c.create_polygon(x - 4, y - 96 + bob, x + 6, y - 96 + bob, x, y - 88 + bob, fill=self.accent_red, outline="")
+            # Щит и меч
+            c.create_oval(x - 24, y - 58 + bob, x - 8, y - 34 + bob, fill="#5c6370", outline=self.accent_gold, width=2)
+            sword_swing = -18 if self.hero_offset_x > 10 else 0
+            c.create_line(x + 16, y - 44 + bob, x + 44 + sword_swing, y - 76 + bob, fill="#e6e8f0", width=4)
+            c.create_line(x + 14, y - 50 + bob, x + 24, y - 40 + bob, fill=self.accent_gold, width=3)
+        elif cls == "Плут":
+            # Капюшон и два кинжала
+            c.create_polygon(x - 15, y - 68 + bob, x, y - 96 + bob, x + 15, y - 68 + bob, fill="#3b5238", outline="#12131a", width=2)
+            c.create_line(x + 15, y - 42 + bob, x + 34, y - 52 + bob, fill="#e6e8f0", width=3)
+            c.create_line(x - 15, y - 42 + bob, x - 32, y - 48 + bob, fill="#e6e8f0", width=3)
+        else:
+            # Остроконечная шляпа мага и посох со сферой
+            c.create_polygon(x - 18, y - 82 + bob, x + 18, y - 82 + bob, x - 2, y - 114 + bob, fill="#3a5f8a", outline="#12131a", width=2)
+            c.create_line(x + 20, y - 4, x + 24, y - 86 + bob, fill="#8a6240", width=4)
+            orb_r = 6 + math.sin(t * 0.25) * 2
+            c.create_oval(x + 24 - orb_r, y - 90 + bob - orb_r, x + 24 + orb_r, y - 90 + bob + orb_r, fill=self.accent_blue, outline="#ffffff")
+
+        # Полоска HP над героем
+        self.draw_hp_bar(c, x, y - 118, self.player["hp"], self.player["max_hp"], self.accent_green)
+
+    def draw_enemy(self, c, x, y, enemy, t):
+        bob = math.sin(t * 0.18 + 1.2) * 3.5
+        etype = enemy["type"]
+        c.create_oval(x - 26, y - 6, x + 26, y + 6, fill="#090a0f", outline="")
+
+        if etype == "goblin":
+            c.create_rectangle(x - 12, y - 50 + bob, x + 12, y - 20 + bob, fill="#587a46", outline="#12131a", width=2)
+            c.create_oval(x - 12, y - 72 + bob, x + 12, y - 48 + bob, fill="#749c5c", outline="#12131a", width=2)
+            # Острые уши и жёлтые глаза
+            c.create_polygon(x - 12, y - 62 + bob, x - 26, y - 68 + bob, x - 12, y - 56 + bob, fill="#749c5c", outline="")
+            c.create_polygon(x + 12, y - 62 + bob, x + 26, y - 68 + bob, x + 12, y - 56 + bob, fill="#749c5c", outline="")
+            c.create_oval(x - 7, y - 63 + bob, x - 3, y - 59 + bob, fill="#e5c07b", outline="")
+            c.create_oval(x + 3, y - 63 + bob, x + 7, y - 59 + bob, fill="#e5c07b", outline="")
+            c.create_line(x - 16, y - 36 + bob, x - 36, y - 54 + bob, fill="#8a6240", width=5)
+
+        elif etype == "skeleton":
+            c.create_line(x, y - 58 + bob, x, y - 24 + bob, fill="#dcdde1", width=5)
+            for ry in (52, 44, 36):
+                c.create_line(x - 11, y - ry + bob, x + 11, y - ry + bob, fill="#dcdde1", width=3)
+            c.create_line(x - 8, y - 24 + bob, x - 10, y - 2, fill="#dcdde1", width=4)
+            c.create_line(x + 8, y - 24 + bob, x + 10, y - 2, fill="#dcdde1", width=4)
+            c.create_oval(x - 11, y - 80 + bob, x + 11, y - 58 + bob, fill="#f5f6fa", outline="#12131a", width=2)
+            c.create_oval(x - 6, y - 72 + bob, x - 2, y - 68 + bob, fill="#e06c75", outline="")
+            c.create_oval(x + 2, y - 72 + bob, x + 6, y - 68 + bob, fill="#e06c75", outline="")
+
+        elif etype == "orc":
+            c.create_rectangle(x - 19, y - 72 + bob, x + 19, y - 24 + bob, fill="#4b6b3c", outline="#12131a", width=2)
+            c.create_oval(x - 14, y - 96 + bob, x + 14, y - 70 + bob, fill="#5f874c", outline="#12131a", width=2)
+            # Клыки и огромный топор
+            c.create_polygon(x - 8, y - 74 + bob, x - 5, y - 82 + bob, x - 3, y - 74 + bob, fill="#ffffff", outline="")
+            c.create_polygon(x + 3, y - 74 + bob, x + 5, y - 82 + bob, x + 8, y - 74 + bob, fill="#ffffff", outline="")
+            c.create_line(x - 22, y - 16, x - 34, y - 86 + bob, fill="#6e4b2c", width=5)
+            c.create_polygon(x - 46, y - 86 + bob, x - 24, y - 86 + bob, x - 35, y - 68 + bob, fill="#abb2bf", outline="")
+
+        elif etype == "cultist":
+            c.create_polygon(x - 20, y - 4, x + 20, y - 4, x + 12, y - 66 + bob, x - 12, y - 66 + bob, fill="#5c2d5c", outline="#12131a", width=2)
+            c.create_polygon(x - 14, y - 64 + bob, x, y - 90 + bob, x + 14, y - 64 + bob, fill="#421c42", outline="#12131a", width=2)
+            c.create_oval(x - 24, y - 54 + bob, x - 14, y - 44 + bob, fill=self.accent_purple, outline="#ffffff")
+
+        else:
+            # Парящий Древний Лич Азарот
+            hover = math.sin(t * 0.14) * 7.0 - 12
+            c.create_polygon(x - 26, y - 10 + hover, x + 26, y - 10 + hover, x + 15, y - 84 + hover, x - 15, y - 84 + hover, fill="#241536", outline=self.accent_purple, width=2)
+            c.create_oval(x - 14, y - 108 + hover, x + 14, y - 82 + hover, fill="#e6e8f0", outline="#12131a", width=2)
+            # Корона Лича
+            c.create_polygon(x - 14, y - 106 + hover, x - 10, y - 120 + hover, x, y - 110 + hover, x + 10, y - 120 + hover, x + 14, y - 106 + hover, fill=self.accent_gold, outline="")
+            c.create_oval(x - 7, y - 98 + hover, x - 2, y - 93 + hover, fill=self.accent_green, outline="")
+            c.create_oval(x + 2, y - 98 + hover, x + 7, y - 93 + hover, fill=self.accent_green, outline="")
+
+        self.draw_hp_bar(c, x, y - 126, enemy["hp"], enemy["max_hp"], self.accent_red, enemy["name"])
+
+    def draw_chest(self, c, x, y, opened):
+        c.create_oval(x - 32, y - 6, x + 32, y + 6, fill="#090a0f", outline="")
+        c.create_rectangle(x - 28, y - 36, x + 28, y - 2, fill="#6e472b", outline=self.accent_gold, width=2)
+        if opened:
+            c.create_rectangle(x - 28, y - 54, x + 28, y - 36, fill="#4a2e1b", outline=self.accent_gold, width=2)
+            c.create_oval(x - 14, y - 42, x + 14, y - 30, fill=self.accent_gold, outline="")
+        else:
+            c.create_arc(x - 28, y - 54, x + 28, y - 18, start=0, extent=180, fill="#855635", outline=self.accent_gold, width=2)
+            c.create_rectangle(x - 5, y - 40, x + 5, y - 26, fill=self.accent_gold, outline="#12131a")
+
+    def draw_trap(self, c, x, y, t):
+        # Качающийся гигантский маятник-секира
+        swing = math.sin(t * 0.14) * 0.75
+        bx = x + math.sin(swing) * 145
+        by = 15 + math.cos(swing) * 145
+        c.create_line(x, 10, bx, by, fill="#8b92a8", width=4)
+        c.create_arc(bx - 26, by - 18, bx + 26, by + 24, start=200, extent=140, fill="#dcdde1", outline=self.accent_red, width=2)
+        # Шипы на полу
+        for sx in range(x - 45, x + 50, 18):
+            c.create_polygon(sx - 6, y, sx, y - 16, sx + 6, y, fill="#abb2bf", outline="")
+
+    def draw_altar(self, c, x, y, t, used):
+        c.create_polygon(x - 22, y - 2, x + 22, y - 2, x + 14, y - 82, x - 14, y - 82, fill="#353b4f", outline="#61afef", width=2)
+        if not used:
+            pulse = 10 + math.sin(t * 0.22) * 4
+            c.create_oval(x - pulse, y - 98 - pulse, x + pulse, y - 98 + pulse, fill=self.accent_purple, outline="#ffffff", width=2)
+
+    def draw_hp_bar(self, c, x, y, hp, max_hp, color, label=None):
+        w = 76
+        ratio = max(0.0, min(1.0, hp / max_hp))
+        if label:
+            c.create_text(x, y - 12, text=label, font=("Segoe UI", 8, "bold"), fill=self.fg_text)
+        c.create_rectangle(x - w // 2, y - 4, x + w // 2, y + 4, fill="#090a0f", outline="#32384d")
+        if ratio > 0:
+            c.create_rectangle(
+                x - w // 2 + 1, y - 3, x - w // 2 + int((w - 2) * ratio), y + 3, fill=color, outline=""
+            )
+
+    # ---------------- ОТРИСОВКА АНИМИРОВАННОГО КУБИКА D20 ----------------
+    def draw_d20(self):
+        c = self.dice_canvas
+        c.delete("all")
+        cx, cy = 75, 72
+        r_outer = 58
+        r_inner = 31
+        ang = self.dice_angle if self.rolling else 0.0
+
+        outer_pts = []
+        for i in range(6):
+            a = math.radians(i * 60 - 90) + ang
+            outer_pts.append((cx + r_outer * math.cos(a), cy + r_outer * math.sin(a)))
+
+        inner_pts = []
+        for i in range(3):
+            a = math.radians(i * 120 - 90) - ang * 0.6
+            inner_pts.append((cx + r_inner * math.cos(a), cy + r_inner * math.sin(a)))
+
+        flat_outer = [coord for pt in outer_pts for coord in pt]
+        c.create_polygon(flat_outer, fill="#1e2230", outline=self.dice_color, width=3)
+
+        for i in range(3):
+            ix, iy = inner_pts[i]
+            for idx in ((i * 2) % 6, (i * 2 + 1) % 6, (i * 2 - 1) % 6):
+                ox, oy = outer_pts[idx]
+                c.create_line(ix, iy, ox, oy, fill=self.dice_color, width=2)
+
+        flat_inner = [coord for pt in inner_pts for coord in pt]
+        c.create_polygon(flat_inner, fill="#282d40", outline=self.dice_color, width=2)
+
+        c.create_text(
+            cx,
+            cy + 2,
+            text=str(self.dice_val),
+            font=("Georgia", 20, "bold"),
+            fill=self.dice_color,
+        )
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AnimatedDungeonApp(root)
+    root.mainloop()
