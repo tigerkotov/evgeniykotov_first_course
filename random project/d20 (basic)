@@ -1,0 +1,52 @@
+import random
+import math
+import time
+
+boss_hp = 100
+dice_crit = 40
+
+def Error(text):
+    for i in text:
+        time.sleep(1)
+        print(i, end="", flush=True)
+    print()
+
+while True:
+
+    start = input("Напишите да, чтобы кинуть кубики. Напишите нет, если хотите завершить: ").lower()
+
+    if start == "да":
+        dice1 = random.uniform(0, 19)
+        dice1 = math.ceil(dice1)
+
+        dice2 = random.uniform(0, 19)
+        dice2 = math.ceil(dice2)
+
+        Error("...")
+        print(f"Первый кубик: {dice1}. Второй кубик: {dice2}")
+
+        if dice1 == 20 and dice2 == 20:
+            boss_hp -= dice_crit
+            print(f"Здоровье босса: {boss_hp}")
+
+        elif dice1 == 6 and dice2 == 7:
+            print("Братишка, ты получил силу которая и не снилась твоему отцу!")
+            boss_hp -= 67
+            print(f"Минус sixseven hp: {boss_hp}")
+        elif dice1 == 1 and dice2 == 1:
+            print("Босс стал сильнее")
+            boss_hp += 20
+            print(f"Здоровье босса: {boss_hp}")
+        else:
+            boss_hp -= (dice1 + dice2)
+            print(f"Здоровье босса: {boss_hp}")
+
+        if boss_hp <= 0:
+            print("Босс побежден")
+            break
+
+    else:
+        break
+
+
+
