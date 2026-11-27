@@ -56,7 +56,7 @@ BOSS = {"name": "ДРЕВНИЙ ЛИЧ АЗАРОТ", "type": "lich", "hp": 45, 
 class AnimatedDungeonApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Подземелье d20 — Анимированная RPG")
+        self.root.title("Подземелье 2d20 — Анимированная RPG")
         self.root.geometry("960x720")
         self.root.configure(bg="#12131a")
         self.root.resizable(False, False)
@@ -79,24 +79,29 @@ class AnimatedDungeonApp:
 
         self.player = None
         self.room = 1
-        self.room_type = "combat"  # combat, chest, trap, altar
+        self.room_type = "combat"
         self.enemy = None
         self.room_cleared = False
         self.rolling = False
 
-        # Состояние анимаций сцены и кубика
+        # Состояние анимаций сцены и двух кубиков
         self.tick = 0
         self.hero_offset_x = 0.0
         self.enemy_offset_x = 0.0
         self.enemy_shake = 0
         self.hero_shake = 0
         self.room_transition_alpha = 0.0
-        self.vfx_list = []       # вспышки ударов, заклинаний, искры
-        self.floating_texts = [] # всплывающий урон и хил
+        self.vfx_list = []
+        self.floating_texts = []
         self.torches = [(70, 95), (560, 95)]
-        self.dice_angle = 0.0
-        self.dice_val = 20
-        self.dice_color = self.accent_gold
+
+        # Параметры двух кубиков d20 (значения складываются)
+        self.dice_angle_1 = 0.0
+        self.dice_angle_2 = 0.4
+        self.dice_val_1 = 10
+        self.dice_val_2 = 10
+        self.dice_color_1 = self.accent_gold
+        self.dice_color_2 = self.accent_gold
 
         self.show_class_selection()
         self.animation_loop()
@@ -113,7 +118,7 @@ class AnimatedDungeonApp:
 
         tk.Label(
             frame,
-            text="⚔ ПОДЗЕМЕЛЬЕ D20 ⚔",
+            text="⚔ ПОДЗЕМЕЛЬЕ 2D20 ⚔",
             font=self.font_title,
             fg=self.accent_gold,
             bg=self.bg_main,
@@ -121,7 +126,7 @@ class AnimatedDungeonApp:
 
         tk.Label(
             frame,
-            text="Выберите героя для спуска в анимированное подземелье:",
+            text="Выберите героя (броски и урон обоих кубиков суммируются):",
             font=self.font_body,
             fg=self.fg_muted,
             bg=self.bg_main,
@@ -228,7 +233,7 @@ class AnimatedDungeonApp:
         self.lbl_stats = tk.Label(top_bar, font=self.font_body, fg=self.fg_text, bg=self.bg_panel)
         self.lbl_stats.pack(side="right")
 
-        # Основной контейнер (слева сцена + управление, справа кубик + журнал)
+        # Основной контейнер
         body = tk.Frame(self.root, bg=self.bg_main)
         body.pack(expand=True, fill="both", padx=14, pady=10)
 
@@ -269,23 +274,23 @@ class AnimatedDungeonApp:
         self.btn_frame = tk.Frame(action_box, bg=self.bg_panel)
         self.btn_frame.pack(fill="x", side="bottom")
 
-        # Правая колонка: Анимированный кубик d20 и журнал боя
+        # Правая колонка: Два анимированных кубика d20 и журнал боя
         right_col = tk.Frame(body, bg=self.bg_panel, width=290, padx=12, pady=10)
         right_col.pack(side="right", fill="y")
         right_col.pack_propagate(False)
 
         tk.Label(
-            right_col, text="БРОСОК D20", font=self.font_sub, fg=self.accent_gold, bg=self.bg_panel
+            right_col, text="БРОСОК 2D20 (СУММА)", font=self.font_sub, fg=self.accent_gold, bg=self.bg_panel
         ).pack()
 
         self.dice_canvas = tk.Canvas(
-            right_col, width=150, height=145, bg=self.bg_panel, highlightthickness=0
+            right_col, width=266, height=130, bg=self.bg_panel, highlightthickness=0
         )
         self.dice_canvas.pack(pady=4)
 
         self.lbl_dice_formula = tk.Label(
             right_col,
-            text="Готов к броску",
+            text="Готов к броску 2d20",
             font=self.font_sub,
             fg=self.fg_muted,
             bg=self.bg_panel,
@@ -344,6 +349,9 @@ class AnimatedDungeonApp:
         if self.room % 5 == 0:
             self.room_type = "combat"
             self.enemy = BOSS.copy()
+            # Усиление босса под парный урон 2 кубиков
+            self.enemy["hp"] = int(self.enemy["hp"] * 1.7)
+            self.enemy["ac"] += 8
             self.lbl_room_title.configure(text=f"Комната {self.room}: Тронный зал Лича")
             self.lbl_room_desc.configure(
                 text=f"Перед вами парит {self.enemy['name']} (HP {self.enemy['hp']}, AC {self.enemy['ac']})! Воздух пропитан некромантией."
@@ -354,9 +362,10 @@ class AnimatedDungeonApp:
             if self.room_type == "combat":
                 base = random.choice(MONSTERS).copy()
                 scale = (self.room - 1) // 3
-                base["hp"] += scale * 4
+                # Балансировка HP и AC под сумму 2d20 и двойной урон
+                base["hp"] = int(base["hp"] * 1.6) + scale * 7
                 base["max_hp"] = base["hp"]
-                base["ac"] += min(3, scale // 2)
+                base["ac"] += 8 + min(4, scale)
                 base["dmg"] += scale
                 self.enemy = base
                 self.lbl_room_title.configure(text=f"Комната {self.room}: Засада в катакомбах")
@@ -367,19 +376,19 @@ class AnimatedDungeonApp:
             elif self.room_type == "chest":
                 self.lbl_room_title.configure(text=f"Комната {self.room}: Запертый реликварий")
                 self.lbl_room_desc.configure(
-                    text="В центре зала стоит окованный железом сундук с древним замком (Сложность DC 13)."
+                    text="В центре зала стоит окованный железом сундук с древним замком (Сложность DC 22)."
                 )
                 self.log(f"--- Комната {self.room}: Запертый сундук ---", "gold")
             elif self.room_type == "trap":
                 self.lbl_room_title.configure(text=f"Комната {self.room}: Зал маятников и шипов")
                 self.lbl_room_desc.configure(
-                    text="Плиты под ногами зловеще проседают! Требуется спасбросок Ловкости (DC 13)."
+                    text="Плиты под ногами зловеще проседают! Требуется спасбросок Ловкости (DC 22)."
                 )
                 self.log(f"--- Комната {self.room}: Ловушка! ---", "fail")
             else:
                 self.lbl_room_title.configure(text=f"Комната {self.room}: Рунический алтарь")
                 self.lbl_room_desc.configure(
-                    text="Древний обелиск пульсирует синим светом. Проверка Интеллекта (DC 12) раскроет его дар."
+                    text="Древний обелиск пульсирует синим светом. Проверка Интеллекта (DC 20) раскроет его дар."
                 )
                 self.log(f"--- Комната {self.room}: Магический алтарь ---", "info")
 
@@ -426,7 +435,7 @@ class AnimatedDungeonApp:
             if self.room_type == "combat":
                 tk.Button(
                     self.btn_frame,
-                    text=f"⚔ Атаковать ({self.player['weapon']})",
+                    text=f"⚔ Атаковать ({self.player['weapon']} ×2)",
                     font=self.font_sub,
                     bg=self.accent_red,
                     fg="#12131a",
@@ -439,7 +448,7 @@ class AnimatedDungeonApp:
             elif self.room_type == "chest":
                 tk.Button(
                     self.btn_frame,
-                    text="🗝 Взломать замок (ЛОВ, DC 13)",
+                    text="🗝 Взломать замок (ЛОВ, DC 22)",
                     font=self.font_sub,
                     bg=self.accent_gold,
                     fg="#12131a",
@@ -464,7 +473,7 @@ class AnimatedDungeonApp:
             elif self.room_type == "trap":
                 tk.Button(
                     self.btn_frame,
-                    text="⚡ Спасбросок Ловкости (DC 13)",
+                    text="⚡ Спасбросок Ловкости (DC 22)",
                     font=self.font_sub,
                     bg=self.accent_blue,
                     fg="#12131a",
@@ -477,7 +486,7 @@ class AnimatedDungeonApp:
             elif self.room_type == "altar":
                 tk.Button(
                     self.btn_frame,
-                    text="✨ Изучить руны (ИНТ, DC 12)",
+                    text="✨ Изучить руны (ИНТ, DC 20)",
                     font=self.font_sub,
                     bg=self.accent_purple,
                     fg="#12131a",
@@ -514,38 +523,52 @@ class AnimatedDungeonApp:
                 command=self.use_potion,
             ).pack(side="right")
 
-    # ---------------- АНИМАЦИЯ КУБИКА D20 ----------------
+    # ---------------- АНИМАЦИЯ ДВУХ КУБИКОВ 2D20 (СУММА) ----------------
+    def _die_color(self, val):
+        if val == 20:
+            return self.accent_green
+        if val == 1:
+            return self.accent_red
+        return self.accent_gold
+
     def roll_d20_animated(self, mod, target_dc, label, callback):
         self.rolling = True
         self.render_buttons()
-        final_roll = random.randint(1, 20)
-        total = final_roll + mod
+        final_1 = random.randint(1, 20)
+        final_2 = random.randint(1, 20)
+        dice_sum = final_1 + final_2
+        total = dice_sum + mod
         steps = 16
 
         def step(i):
             if i < steps:
-                self.dice_val = random.randint(1, 20)
-                self.dice_angle += 0.55 * (1.0 - i / (steps + 3))
-                self.dice_color = self.accent_blue
-                self.lbl_dice_formula.configure(text=f"{label}...", fg=self.fg_muted)
+                self.dice_val_1 = random.randint(1, 20)
+                self.dice_val_2 = random.randint(1, 20)
+                spin = 0.55 * (1.0 - i / (steps + 3))
+                self.dice_angle_1 += spin
+                self.dice_angle_2 -= spin * 1.15
+                self.dice_color_1 = self.accent_blue
+                self.dice_color_2 = self.accent_purple
+                self.lbl_dice_formula.configure(text=f"{label} (2d20)...", fg=self.fg_muted)
                 delay = int(28 + (i ** 1.6) * 2.5)
                 self.root.after(delay, lambda: step(i + 1))
             else:
-                self.dice_val = final_roll
-                if final_roll == 20:
-                    self.dice_color = self.accent_green
-                elif final_roll == 1:
-                    self.dice_color = self.accent_red
-                else:
-                    self.dice_color = self.accent_gold
+                self.dice_val_1 = final_1
+                self.dice_val_2 = final_2
+                self.dice_color_1 = self._die_color(final_1)
+                self.dice_color_2 = self._die_color(final_2)
 
                 sign = f"+{mod}" if mod >= 0 else str(mod)
+                result_color = self.accent_green if total >= target_dc or (final_1 == 20 and final_2 == 20) else self.accent_gold
+                if final_1 == 1 and final_2 == 1:
+                    result_color = self.accent_red
+
                 self.lbl_dice_formula.configure(
-                    text=f"d20 ({final_roll}) {sign} = {total}  [Цель: {target_dc}]",
-                    fg=self.dice_color,
+                    text=f"({final_1} + {final_2}) {sign} = {total}  [Цель: {target_dc}]",
+                    fg=result_color,
                 )
                 self.rolling = False
-                callback(final_roll, total)
+                callback(final_1, final_2, total)
                 self.render_buttons()
 
         step(0)
@@ -562,27 +585,36 @@ class AnimatedDungeonApp:
         mod = p[p["stat"]]
         ac = self.enemy["ac"]
 
-        def on_roll(roll, total):
-            # Рывок героя вперёд
+        def on_roll(r1, r2, total):
             self.hero_offset_x = 55.0
-            if roll == 1:
-                self.log("КРИТИЧЕСКИЙ ПРОВАЛ (1)! Вы споткнулись и промахнулись.", "fail")
+            if r1 == 1 and r2 == 1:
+                self.log("ДВОЙНОЙ ПРОВАЛ (1 + 1)! Вы споткнулись и промахнулись.", "fail")
                 self.spawn_floating_text(440, 120, "ПРОМАХ!", self.accent_red)
                 self.root.after(450, self.enemy_turn)
                 return
 
-            if roll == 20 or total >= ac:
-                dmg = random.randint(1, p["die"]) + mod
-                if roll == 20:
+            is_crit = (r1 == 20 or r2 == 20)
+            if is_crit or total >= ac:
+                # Урон обоих кубиков складывается: (бросок_1 + мод) + (бросок_2 + мод)
+                dmg_1 = random.randint(1, p["die"]) + mod
+                dmg_2 = random.randint(1, p["die"]) + mod
+                dmg = dmg_1 + dmg_2
+
+                if r1 == 20 and r2 == 20:
                     dmg *= 2
-                    self.log(f"НАТУРАЛЬНАЯ 20! Сокрушительный удар на {dmg} урона!", "crit")
+                    self.log(f"ДВОЙНАЯ 20! Сокрушительный удар: ({dmg_1} + {dmg_2}) × 2 = {dmg} урона!", "crit")
+                    self.spawn_vfx(445, 165, "crit", self.accent_gold)
+                    self.spawn_floating_text(445, 105, f"МЕГА КРИТ -{dmg}!", self.accent_gold)
+                elif is_crit:
+                    dmg = int(dmg * 1.5)
+                    self.log(f"КРИТИЧЕСКИЙ УДАР (20 на кубике)! Сумма урона ({dmg_1} + {dmg_2}) × 1.5 = {dmg}!", "crit")
                     self.spawn_vfx(445, 165, "crit", self.accent_gold)
                     self.spawn_floating_text(445, 105, f"КРИТ -{dmg}!", self.accent_gold)
                 else:
-                    self.log(f"Попадание ({total} vs AC {ac})! Нанесено {dmg} урона.", "crit")
+                    self.log(f"Попадание ({total} vs AC {ac})! Урон кубиков: {dmg_1} + {dmg_2} = {dmg}.", "crit")
                     vfx_kind = "magic" if p["class"] == "Маг" else "slash"
                     self.spawn_vfx(445, 165, vfx_kind, p["color"])
-                    self.spawn_floating_text(445, 110, f"-{dmg}", self.accent_green)
+                    self.spawn_floating_text(445, 110, f"-{dmg} ({dmg_1}+{dmg_2})", self.accent_green)
 
                 self.enemy["hp"] = max(0, self.enemy["hp"] - dmg)
                 self.enemy_shake = 10
@@ -639,9 +671,9 @@ class AnimatedDungeonApp:
 
     def action_chest(self):
         mod = self.player["dex"]
-        def on_roll(roll, total):
+        def on_roll(r1, r2, total):
             self.hero_offset_x = 40.0
-            if roll == 20 or total >= 13:
+            if r1 == 20 or r2 == 20 or total >= 22:
                 gold = random.randint(20, 40)
                 self.player["gold"] += gold
                 self.spawn_vfx(445, 180, "magic", self.accent_gold)
@@ -651,45 +683,45 @@ class AnimatedDungeonApp:
                     self.log(f"Замок вскрыт ({total})! Найдено {gold} золота и зелье лечения!", "crit")
                 else:
                     self.log(f"Замок вскрыт ({total})! Внутри {gold} золотых монет.", "gold")
-            elif roll == 1:
+            elif r1 == 1 and r2 == 1:
                 dmg = random.randint(3, 6)
                 self.player["hp"] = max(0, self.player["hp"] - dmg)
                 self.hero_shake = 10
                 self.spawn_vfx(185, 165, "slash", self.accent_red)
                 self.spawn_floating_text(185, 110, f"-{dmg}", self.accent_red)
-                self.log(f"Критическая неудача (1)! Сработала игла с ядом: -{dmg} HP.", "fail")
+                self.log(f"Критическая неудача (1+1)! Сработала игла с ядом: -{dmg} HP.", "fail")
             else:
-                self.log(f"Отмычка застряла ({total} против DC 13). Сундук не поддался.", "info")
+                self.log(f"Отмычка застряла ({total} против DC 22). Сундук не поддался.", "info")
             self.room_cleared = True
             self.update_hud()
             self.render_buttons()
 
-        self.roll_d20_animated(mod, 13, "Взлом замка", on_roll)
+        self.roll_d20_animated(mod, 22, "Взлом замка", on_roll)
 
     def action_trap(self):
         mod = self.player["dex"]
-        def on_roll(roll, total):
+        def on_roll(r1, r2, total):
             self.hero_offset_x = 45.0
-            if roll == 20 or total >= 13:
+            if r1 == 20 or r2 == 20 or total >= 22:
                 self.spawn_floating_text(220, 110, "ЛОВКИЙ РЫВОК!", self.accent_green)
-                self.log(f"Успех ({total} vs DC 13)! Вы акробатически проскочили мимо лезвий.", "crit")
+                self.log(f"Успех ({total} vs DC 22)! Вы акробатически проскочили мимо лезвий.", "crit")
             else:
                 dmg = random.randint(4, 9)
                 self.player["hp"] = max(0, self.player["hp"] - dmg)
                 self.hero_shake = 12
                 self.spawn_vfx(220, 165, "slash", self.accent_red)
                 self.spawn_floating_text(220, 110, f"-{dmg} HP", self.accent_red)
-                self.log(f"Провал ({total} vs DC 13)! Лезвие задело вас на {dmg} урона.", "fail")
+                self.log(f"Провал ({total} vs DC 22)! Лезвие задело вас на {dmg} урона.", "fail")
             self.room_cleared = True
             self.update_hud()
             self.render_buttons()
 
-        self.roll_d20_animated(mod, 13, "Спасбросок Ловкости", on_roll)
+        self.roll_d20_animated(mod, 22, "Спасбросок Ловкости", on_roll)
 
     def action_altar(self):
         mod = self.player["int"]
-        def on_roll(roll, total):
-            if roll == 20 or total >= 12:
+        def on_roll(r1, r2, total):
+            if r1 == 20 or r2 == 20 or total >= 20:
                 heal = random.randint(8, 14)
                 self.player["hp"] = min(self.player["max_hp"], self.player["hp"] + heal)
                 self.player["xp"] += 25
@@ -698,12 +730,12 @@ class AnimatedDungeonApp:
                 self.log(f"Тайна рун раскрыта ({total})! Восстановлено {heal} HP и получено +25 XP.", "crit")
                 self.check_level_up()
             else:
-                self.log(f"Символы неясны ({total} vs DC 12). Алтарь погас.", "info")
+                self.log(f"Символы неясны ({total} vs DC 20). Алтарь погас.", "info")
             self.room_cleared = True
             self.update_hud()
             self.render_buttons()
 
-        self.roll_d20_animated(mod, 12, "Тайные знания", on_roll)
+        self.roll_d20_animated(mod, 20, "Тайные знания", on_roll)
 
     def use_potion(self):
         if self.player["potions"] <= 0:
@@ -742,7 +774,6 @@ class AnimatedDungeonApp:
     # ---------------- ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ ----------------
     def animation_loop(self):
         self.tick += 1
-        # Плавное возвращение персонажей на исходные позиции
         self.hero_offset_x *= 0.78
         self.enemy_offset_x *= 0.78
         if abs(self.hero_offset_x) < 0.3:
@@ -757,7 +788,6 @@ class AnimatedDungeonApp:
         if self.room_transition_alpha > 0:
             self.room_transition_alpha = max(0.0, self.room_transition_alpha - 0.08)
 
-        # Обновление визуальных эффектов и всплывающего текста
         for v in self.vfx_list:
             v["life"] -= 1
         self.vfx_list = [v for v in self.vfx_list if v["life"] > 0]
@@ -780,7 +810,6 @@ class AnimatedDungeonApp:
         w, h = 630, 270
         t = self.tick
 
-        # Каменная стена и арки подземелья
         c.create_rectangle(0, 0, w, 215, fill="#151722", outline="")
         for row in range(0, 215, 36):
             offset = 30 if (row // 36) % 2 == 0 else 0
@@ -788,23 +817,19 @@ class AnimatedDungeonApp:
             for col in range(-offset, w, 60):
                 c.create_line(col, row, col, row + 36, fill="#1f2233", width=2)
 
-        # Декоративные сводчатые арки на заднем плане
         for ax in (160, 315, 470):
             c.create_arc(ax - 55, 35, ax + 55, 210, start=0, extent=180, fill="#10121b", outline="#282c40", width=3)
             c.create_rectangle(ax - 55, 120, ax + 55, 215, fill="#10121b", outline="")
 
-        # Каменный пол
         c.create_rectangle(0, 215, w, h, fill="#1f2330", outline="#32384d", width=2)
         for fx in range(0, w, 45):
             c.create_line(fx, 215, fx - 18, h, fill="#2b3042", width=2)
 
-        # Мерцающие настенные факелы
         for idx, (tx, ty) in enumerate(self.torches):
             flicker = math.sin(t * 0.35 + idx * 2.1) * 4
             glow_r = 46 + flicker * 2
             c.create_oval(tx - glow_r, ty - glow_r, tx + glow_r, ty + glow_r, fill="#261c16", outline="")
             c.create_rectangle(tx - 4, ty, tx + 4, ty + 28, fill="#5c4033", outline="")
-            # Языки пламени
             c.create_polygon(
                 tx - 9, ty + 2,
                 tx + flicker * 0.5, ty - 22 - flicker,
@@ -818,13 +843,11 @@ class AnimatedDungeonApp:
                 fill="#e5c07b", outline="", smooth=True
             )
 
-        # Отрисовка Героя (слева)
         shake_hx = random.randint(-5, 5) if self.hero_shake > 0 else 0
         hx = 185 + self.hero_offset_x + shake_hx
         hy = 215
         self.draw_hero(c, hx, hy, t)
 
-        # Отрисовка содержимого комнаты (справа)
         shake_ex = random.randint(-6, 6) if self.enemy_shake > 0 else 0
         ex = 445 + self.enemy_offset_x + shake_ex
         ey = 215
@@ -838,7 +861,6 @@ class AnimatedDungeonApp:
         elif self.room_type == "altar":
             self.draw_altar(c, ex, ey, t, self.room_cleared)
 
-        # Визуальные эффекты ударов / заклинаний
         for v in self.vfx_list:
             ratio = v["life"] / v["max_life"]
             r = (1.0 - ratio) * 48 + 10
@@ -859,27 +881,23 @@ class AnimatedDungeonApp:
                         fill=v["color"], width=3
                     )
 
-        # Всплывающие цифры урона / лечения
         for ft in self.floating_texts:
             c.create_text(
                 ft["x"], ft["y"], text=ft["text"], font=self.font_sub, fill=ft["color"]
             )
 
-        # Эффект перехода в новую комнату (затемнение по краям)
         if self.room_transition_alpha > 0:
             bar_w = int(w * 0.5 * self.room_transition_alpha)
             c.create_rectangle(0, 0, bar_w, h, fill="#090a0f", outline="")
             c.create_rectangle(w - bar_w, 0, w, h, fill="#090a0f", outline="")
 
     def draw_hero(self, c, x, y, t):
-        bob = math.sin(t * 0.16) * 3.0  # Дыхание / покачивание
+        bob = math.sin(t * 0.16) * 3.0
         cls = self.player["class"]
         col = self.player["color"]
 
-        # Тень
         c.create_oval(x - 24, y - 6, x + 24, y + 6, fill="#090a0f", outline="")
 
-        # Плащ
         cape_wave = math.sin(t * 0.2) * 5
         c.create_polygon(
             x - 10, y - 62 + bob,
@@ -888,39 +906,29 @@ class AnimatedDungeonApp:
             fill="#2c3144", outline=""
         )
 
-        # Ноги
         c.create_line(x - 8, y - 28 + bob, x - 10, y - 2, fill="#abb2bf", width=5)
         c.create_line(x + 8, y - 28 + bob, x + 10, y - 2, fill="#abb2bf", width=5)
 
-        # Тело / Броня
         c.create_rectangle(x - 14, y - 64 + bob, x + 14, y - 28 + bob, fill=col, outline="#12131a", width=2)
-
-        # Голова
         c.create_oval(x - 12, y - 88 + bob, x + 12, y - 64 + bob, fill="#f0d5b8", outline="#12131a", width=2)
 
-        # Классовый головной убор и оружие
         if cls == "Воин":
-            # Шлем с гребнем и меч
             c.create_arc(x - 13, y - 92 + bob, x + 13, y - 68 + bob, start=0, extent=180, fill="#8b92a8", outline="#12131a", width=2)
             c.create_polygon(x - 4, y - 96 + bob, x + 6, y - 96 + bob, x, y - 88 + bob, fill=self.accent_red, outline="")
-            # Щит и меч
             c.create_oval(x - 24, y - 58 + bob, x - 8, y - 34 + bob, fill="#5c6370", outline=self.accent_gold, width=2)
             sword_swing = -18 if self.hero_offset_x > 10 else 0
             c.create_line(x + 16, y - 44 + bob, x + 44 + sword_swing, y - 76 + bob, fill="#e6e8f0", width=4)
             c.create_line(x + 14, y - 50 + bob, x + 24, y - 40 + bob, fill=self.accent_gold, width=3)
         elif cls == "Плут":
-            # Капюшон и два кинжала
             c.create_polygon(x - 15, y - 68 + bob, x, y - 96 + bob, x + 15, y - 68 + bob, fill="#3b5238", outline="#12131a", width=2)
             c.create_line(x + 15, y - 42 + bob, x + 34, y - 52 + bob, fill="#e6e8f0", width=3)
             c.create_line(x - 15, y - 42 + bob, x - 32, y - 48 + bob, fill="#e6e8f0", width=3)
         else:
-            # Остроконечная шляпа мага и посох со сферой
             c.create_polygon(x - 18, y - 82 + bob, x + 18, y - 82 + bob, x - 2, y - 114 + bob, fill="#3a5f8a", outline="#12131a", width=2)
             c.create_line(x + 20, y - 4, x + 24, y - 86 + bob, fill="#8a6240", width=4)
             orb_r = 6 + math.sin(t * 0.25) * 2
             c.create_oval(x + 24 - orb_r, y - 90 + bob - orb_r, x + 24 + orb_r, y - 90 + bob + orb_r, fill=self.accent_blue, outline="#ffffff")
 
-        # Полоска HP над героем
         self.draw_hp_bar(c, x, y - 118, self.player["hp"], self.player["max_hp"], self.accent_green)
 
     def draw_enemy(self, c, x, y, enemy, t):
@@ -931,7 +939,6 @@ class AnimatedDungeonApp:
         if etype == "goblin":
             c.create_rectangle(x - 12, y - 50 + bob, x + 12, y - 20 + bob, fill="#587a46", outline="#12131a", width=2)
             c.create_oval(x - 12, y - 72 + bob, x + 12, y - 48 + bob, fill="#749c5c", outline="#12131a", width=2)
-            # Острые уши и жёлтые глаза
             c.create_polygon(x - 12, y - 62 + bob, x - 26, y - 68 + bob, x - 12, y - 56 + bob, fill="#749c5c", outline="")
             c.create_polygon(x + 12, y - 62 + bob, x + 26, y - 68 + bob, x + 12, y - 56 + bob, fill="#749c5c", outline="")
             c.create_oval(x - 7, y - 63 + bob, x - 3, y - 59 + bob, fill="#e5c07b", outline="")
@@ -951,7 +958,6 @@ class AnimatedDungeonApp:
         elif etype == "orc":
             c.create_rectangle(x - 19, y - 72 + bob, x + 19, y - 24 + bob, fill="#4b6b3c", outline="#12131a", width=2)
             c.create_oval(x - 14, y - 96 + bob, x + 14, y - 70 + bob, fill="#5f874c", outline="#12131a", width=2)
-            # Клыки и огромный топор
             c.create_polygon(x - 8, y - 74 + bob, x - 5, y - 82 + bob, x - 3, y - 74 + bob, fill="#ffffff", outline="")
             c.create_polygon(x + 3, y - 74 + bob, x + 5, y - 82 + bob, x + 8, y - 74 + bob, fill="#ffffff", outline="")
             c.create_line(x - 22, y - 16, x - 34, y - 86 + bob, fill="#6e4b2c", width=5)
@@ -963,11 +969,9 @@ class AnimatedDungeonApp:
             c.create_oval(x - 24, y - 54 + bob, x - 14, y - 44 + bob, fill=self.accent_purple, outline="#ffffff")
 
         else:
-            # Парящий Древний Лич Азарот
             hover = math.sin(t * 0.14) * 7.0 - 12
             c.create_polygon(x - 26, y - 10 + hover, x + 26, y - 10 + hover, x + 15, y - 84 + hover, x - 15, y - 84 + hover, fill="#241536", outline=self.accent_purple, width=2)
             c.create_oval(x - 14, y - 108 + hover, x + 14, y - 82 + hover, fill="#e6e8f0", outline="#12131a", width=2)
-            # Корона Лича
             c.create_polygon(x - 14, y - 106 + hover, x - 10, y - 120 + hover, x, y - 110 + hover, x + 10, y - 120 + hover, x + 14, y - 106 + hover, fill=self.accent_gold, outline="")
             c.create_oval(x - 7, y - 98 + hover, x - 2, y - 93 + hover, fill=self.accent_green, outline="")
             c.create_oval(x + 2, y - 98 + hover, x + 7, y - 93 + hover, fill=self.accent_green, outline="")
@@ -985,13 +989,11 @@ class AnimatedDungeonApp:
             c.create_rectangle(x - 5, y - 40, x + 5, y - 26, fill=self.accent_gold, outline="#12131a")
 
     def draw_trap(self, c, x, y, t):
-        # Качающийся гигантский маятник-секира
         swing = math.sin(t * 0.14) * 0.75
         bx = x + math.sin(swing) * 145
         by = 15 + math.cos(swing) * 145
         c.create_line(x, 10, bx, by, fill="#8b92a8", width=4)
         c.create_arc(bx - 26, by - 18, bx + 26, by + 24, start=200, extent=140, fill="#dcdde1", outline=self.accent_red, width=2)
-        # Шипы на полу
         for sx in range(x - 45, x + 50, 18):
             c.create_polygon(sx - 6, y, sx, y - 16, sx + 6, y, fill="#abb2bf", outline="")
 
@@ -1012,14 +1014,11 @@ class AnimatedDungeonApp:
                 x - w // 2 + 1, y - 3, x - w // 2 + int((w - 2) * ratio), y + 3, fill=color, outline=""
             )
 
-    # ---------------- ОТРИСОВКА АНИМИРОВАННОГО КУБИКА D20 ----------------
-    def draw_d20(self):
-        c = self.dice_canvas
-        c.delete("all")
-        cx, cy = 75, 72
-        r_outer = 58
-        r_inner = 31
-        ang = self.dice_angle if self.rolling else 0.0
+    # ---------------- ОТРИСОВКА ДВУХ АНИМИРОВАННЫХ КУБИКОВ 2D20 ----------------
+    def _draw_single_d20(self, c, cx, cy, val, angle, color):
+        r_outer = 48
+        r_inner = 25
+        ang = angle if self.rolling else 0.0
 
         outer_pts = []
         for i in range(6):
@@ -1032,24 +1031,31 @@ class AnimatedDungeonApp:
             inner_pts.append((cx + r_inner * math.cos(a), cy + r_inner * math.sin(a)))
 
         flat_outer = [coord for pt in outer_pts for coord in pt]
-        c.create_polygon(flat_outer, fill="#1e2230", outline=self.dice_color, width=3)
+        c.create_polygon(flat_outer, fill="#1e2230", outline=color, width=3)
 
         for i in range(3):
             ix, iy = inner_pts[i]
             for idx in ((i * 2) % 6, (i * 2 + 1) % 6, (i * 2 - 1) % 6):
                 ox, oy = outer_pts[idx]
-                c.create_line(ix, iy, ox, oy, fill=self.dice_color, width=2)
+                c.create_line(ix, iy, ox, oy, fill=color, width=2)
 
         flat_inner = [coord for pt in inner_pts for coord in pt]
-        c.create_polygon(flat_inner, fill="#282d40", outline=self.dice_color, width=2)
+        c.create_polygon(flat_inner, fill="#282d40", outline=color, width=2)
 
         c.create_text(
             cx,
             cy + 2,
-            text=str(self.dice_val),
-            font=("Georgia", 20, "bold"),
-            fill=self.dice_color,
+            text=str(val),
+            font=("Georgia", 18, "bold"),
+            fill=color,
         )
+
+    def draw_d20(self):
+        c = self.dice_canvas
+        c.delete("all")
+        self._draw_single_d20(c, 68, 65, self.dice_val_1, self.dice_angle_1, self.dice_color_1)
+        c.create_text(133, 65, text="+", font=("Georgia", 18, "bold"), fill=self.fg_muted)
+        self._draw_single_d20(c, 198, 65, self.dice_val_2, self.dice_angle_2, self.dice_color_2)
 
 
 if __name__ == "__main__":
